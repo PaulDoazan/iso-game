@@ -8,4 +8,9 @@ export default defineConfig({
     vue(),
     tailwindcss(),
   ],
+  build: {
+    outDir: 'docs',
+    emptyOutDir: true,
+  },
+  base: './', // Use relative paths for GitHub Pages
 })
