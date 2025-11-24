@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
     "preview": "vite preview",
-    "build:gh-pages": "vue-tsc -b && vite build"
+    "build:gh-pages": "vue-tsc -b && vite build",
+    "preview:docs": "cd docs && python3 -m http.server 8000 || npx serve -s . -l 8000"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.17",

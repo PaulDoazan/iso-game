@@ -11,6 +11,7 @@ export default defineConfig({
   build: {
     outDir: 'docs',
     emptyOutDir: true,
+    sourcemap: false, // Disable source maps for production
   },
   base: './', // Use relative paths for GitHub Pages
 })
