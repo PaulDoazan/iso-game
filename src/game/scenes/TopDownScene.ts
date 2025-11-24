@@ -178,6 +178,32 @@ export class TopDownScene extends Container {
     }
   }
 
+  /**
+   * Update screen dimensions (call when window is resized)
+   */
+  updateScreenSize(width: number, height: number) {
+    this.screenWidth = width
+    this.screenHeight = height
+    
+    // Recalculate extended grid size if needed
+    const newExtendedGridSize = Math.max(
+      this.gridSize, 
+      Math.ceil(this.screenWidth / this.tileSize) + 20,
+      Math.ceil(this.screenHeight / this.tileSize) + 20
+    )
+    
+    // Only update if grid size changed significantly
+    if (Math.abs(newExtendedGridSize - this.extendedGridSize) > 5) {
+      this.extendedGridSize = newExtendedGridSize
+      // Recreate pathfinder grid
+      const matrix = Array(this.extendedGridSize).fill(null).map(() => Array(this.extendedGridSize).fill(0))
+      this.grid = new PF.Grid(matrix)
+    }
+    
+    // Recenter sphere by updating scene position
+    this.updateScenePosition(true)
+  }
+
   getSphere(): Sphere {
     return this.sphere
   }

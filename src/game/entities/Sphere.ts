@@ -14,7 +14,7 @@ export class Sphere extends Container {
     
     // Create the sphere graphics
     this.graphics = new Graphics()
-    this.graphics.circle(0, 0, 8)
+    this.graphics.circle(0, 0, 20)
     this.graphics.fill(0xe74c3c)
     this.addChild(this.graphics)
   }
