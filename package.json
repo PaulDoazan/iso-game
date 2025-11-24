@@ -10,12 +10,14 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.17",
+    "pathfinding": "^0.4.18",
     "pixi.js": "^8.14.3",
     "tailwindcss": "^4.1.17",
     "vue": "^3.5.24"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
+    "@types/pathfinding": "^0.1.0",
     "@vitejs/plugin-vue": "^6.0.1",
     "@vue/tsconfig": "^0.8.1",
     "typescript": "~5.9.3",
