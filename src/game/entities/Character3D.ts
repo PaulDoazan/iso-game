@@ -51,7 +51,6 @@ export class Character3D extends Container {
     this.camera.lookAt(0, 0, 0)
     
     // Initialize rotation state
-    // Start facing "forward" which is -Z in Three.js (up on screen in top-down)
     this.currentRotationY = 0
     this.targetRotationY = 0
     
@@ -87,19 +86,12 @@ export class Character3D extends Container {
     this.renderer.render(this.scene, this.camera)
     
     // Create texture from Three.js renderer canvas
-    // Use BaseTexture to have more control
     this.threeTexture = Texture.from(this.threeCanvas)
-    this.threeTexture.update()
     
-    // Ensure texture respects alpha channel
+    // Create sprite from texture
     this.threeSprite = new Sprite(this.threeTexture)
     this.threeSprite.anchor.set(0.5, 0.5)
-    // Make sure sprite blends properly with transparent background
-    this.threeSprite.blendMode = 'normal'
     this.addChild(this.threeSprite)
-    
-    // Don't start independent render loop - we'll render from update() instead
-    // This keeps Three.js rendering in sync with PixiJS
   }
 
   /**
@@ -165,11 +157,10 @@ export class Character3D extends Container {
     rightLeg.position.set(0.3, -0.4, 0)
     group.add(rightLeg)
     
-    // Eyes (positioned to show front direction)
+    // Eyes
     const eyeGeometry = new THREE.SphereGeometry(0.08, 8, 8)
     const eyeMaterial = new THREE.MeshStandardMaterial({ color: 0x000000 })
     
-    // Position eyes on the front (positive Z is forward in Three.js by default)
     const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial)
     leftEye.position.set(-0.15, 1.5, 0.45)
     group.add(leftEye)
@@ -178,12 +169,12 @@ export class Character3D extends Container {
     rightEye.position.set(0.15, 1.5, 0.45)
     group.add(rightEye)
     
-    // Add a visual indicator for front direction (arrow or colored part)
+    // Visual indicator for front direction (yellow arrow)
     const arrowGeometry = new THREE.ConeGeometry(0.2, 0.4, 8)
-    const arrowMaterial = new THREE.MeshStandardMaterial({ color: 0xffff00 }) // Yellow arrow
+    const arrowMaterial = new THREE.MeshStandardMaterial({ color: 0xffff00 })
     const arrow = new THREE.Mesh(arrowGeometry, arrowMaterial)
-    arrow.position.set(0, 0.3, 0.6) // In front of the character
-    arrow.rotation.x = -Math.PI / 2 // Point forward
+    arrow.position.set(0, 0.3, 0.6)
+    arrow.rotation.x = -Math.PI / 2
     group.add(arrow)
     
     return group
@@ -216,13 +207,12 @@ export class Character3D extends Container {
    * Called from update() to keep rendering in sync with PixiJS ticker
    */
   private renderThreeJS() {
-    // Update animation mixer if it exists
     if (this.animationMixer) {
       const delta = this.clock.getDelta()
       this.animationMixer.update(delta)
     }
     
-    // Apply current rotation to character
+    // Apply rotation to character
     this.character.rotation.y = this.currentRotationY
     
     // Animate character when moving (simple bounce)
@@ -233,20 +223,13 @@ export class Character3D extends Container {
       this.character.position.y = 0
     }
     
-    // Clear with transparent background before rendering
-    this.renderer.setClearColor(0x000000, 0)
     // Render Three.js scene
+    this.renderer.setClearColor(0x000000, 0)
     this.renderer.render(this.scene, this.camera)
     
-    // Update PixiJS texture - this tells PixiJS the canvas has changed
-    if (this.threeTexture && this.threeTexture.baseTexture) {
-      try {
-        // Force texture update
-        this.threeTexture.baseTexture.update()
-      } catch (error) {
-        // Silently handle texture update errors
-        console.warn('Texture update error:', error)
-      }
+    // Update PixiJS texture
+    if (this.threeTexture?.baseTexture) {
+      this.threeTexture.baseTexture.update()
     }
   }
 
@@ -269,12 +252,11 @@ export class Character3D extends Container {
     this.targetY = y
     this.isMoving = true
     
-    // Immediately calculate target rotation to face the new direction
+    // Calculate target rotation to face the new direction
     const dx = x - this.currentX
     const dy = y - this.currentY
     if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1) {
       const targetAngle = Math.atan2(dy, dx)
-      // Same rotation calculation as in update()
       this.targetRotationY = Math.PI / 2 - targetAngle + Math.PI / 4
     }
   }
@@ -284,14 +266,10 @@ export class Character3D extends Container {
    * Returns true if still moving, false if reached target
    */
   update(): boolean {
-    // Always update rotation first - this calculates the target rotation
     this.updateRotation()
-    
-    // Render Three.js scene (synchronized with PixiJS ticker)
     this.renderThreeJS()
 
     if (!this.isMoving) {
-      // Even when not moving, continue rotating if there's a target to face
       return false
     }
 
@@ -299,40 +277,21 @@ export class Character3D extends Container {
     const dy = this.targetY - this.currentY
     const distance = Math.sqrt(dx * dx + dy * dy)
 
-    // Calculate target rotation angle based on movement direction
+    // Calculate target rotation based on movement direction
     if (distance > 0.1) {
-      // Calculate angle in radians from current position to target
-      // atan2(dy, dx): 0 = right, π/2 = down, π = left, -π/2 = up
       const targetAngle = Math.atan2(dy, dx)
-      
-      // Set target rotation (character faces movement direction)
-      // In Three.js, rotation.y rotates around Y axis (vertical, pointing up)
-      // When rotation.y = 0, the character faces -Z direction (by default)
-      // 
-      // With isometric camera at angle (8, 12, 8), we need to account for the view
-      // The character's default forward might be rotated relative to screen space
-      //
-      // Mapping screen directions to Three.js rotation.y:
-      // - Screen right (0°) -> Three.js +X -> rotation.y = π/2
-      // - Screen down (π/2) -> Three.js -Z -> rotation.y = 0
-      // - Screen left (π) -> Three.js -X -> rotation.y = -π/2
-      // - Screen up (-π/2) -> Three.js +Z -> rotation.y = π
-      //
-      // But with isometric view, we might need an offset
-      // Try: rotation.y = π/2 - targetAngle + offset
-      // If 45° offset, that's π/4
+      // Convert screen angle to Three.js rotation (with isometric camera offset)
       this.targetRotationY = Math.PI / 2 - targetAngle + Math.PI / 4
     }
 
     if (distance < 0.1) {
-      // Reached target
       this.currentX = this.targetX
       this.currentY = this.targetY
       this.isMoving = false
       return false
     }
 
-    // Smooth interpolation for position
+    // Smooth position interpolation
     this.currentX += dx * this.moveSpeed
     this.currentY += dy * this.moveSpeed
     
@@ -343,33 +302,24 @@ export class Character3D extends Container {
    * Smoothly rotate character towards target rotation
    */
   private updateRotation() {
-    // Normalize angles to [-π, π] range
     let current = this.currentRotationY
     let target = this.targetRotationY
-    
-    // Find shortest rotation path
     let diff = target - current
     
-    // Normalize to [-π, π]
+    // Normalize to shortest path [-π, π]
     while (diff > Math.PI) diff -= Math.PI * 2
     while (diff < -Math.PI) diff += Math.PI * 2
     
-    // Check if we're close enough to stop rotating (small threshold)
+    // Smooth interpolation
     if (Math.abs(diff) < 0.01) {
       this.currentRotationY = target
     } else {
-      // Smooth interpolation - use lerp for more natural rotation
       this.currentRotationY += diff * this.rotationSpeed
     }
     
-    // Normalize current angle to [-π, π]
+    // Normalize current angle
     while (this.currentRotationY > Math.PI) this.currentRotationY -= Math.PI * 2
     while (this.currentRotationY < -Math.PI) this.currentRotationY += Math.PI * 2
-    
-    // Apply rotation to 3D character
-    // This rotates the character around the Y axis (vertical)
-    console.log('currentRotationY', this.currentRotationY)
-    this.character.rotation.y = this.currentRotationY
   }
 
   getPosition(): { x: number; y: number } {
