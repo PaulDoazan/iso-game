@@ -169,14 +169,6 @@ export class Character3D extends Container {
     rightEye.position.set(0.15, 1.5, 0.45)
     group.add(rightEye)
     
-    // Visual indicator for front direction (yellow arrow)
-    const arrowGeometry = new THREE.ConeGeometry(0.2, 0.4, 8)
-    const arrowMaterial = new THREE.MeshStandardMaterial({ color: 0xffff00 })
-    const arrow = new THREE.Mesh(arrowGeometry, arrowMaterial)
-    arrow.position.set(0, 0.3, 0.6)
-    arrow.rotation.x = -Math.PI / 2
-    group.add(arrow)
-    
     return group
   }
 
