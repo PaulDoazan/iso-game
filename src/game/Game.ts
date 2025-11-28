@@ -59,8 +59,8 @@ export class Game {
   private setupEventListeners() {
     if (!this.app || !this.scene) return
 
-    // Handle click events
-    this.app.canvas.addEventListener('click', (event) => {
+    // Handle mousedown events
+    this.app.canvas.addEventListener('mousedown', (event) => {
       const rect = this.app!.canvas.getBoundingClientRect()
       const x = event.clientX - rect.left
       const y = event.clientY - rect.top
