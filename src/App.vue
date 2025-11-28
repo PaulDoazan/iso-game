@@ -33,11 +33,12 @@ const handleResize = () => {
   setTimeout(() => {
     const app = game.getApp()
     if (app && canvasRef.value) {
+      // Resize renderer to match window (resizeTo: window handles this, but we ensure it's synced)
       app.renderer.resize(window.innerWidth, window.innerHeight)
       const scene = game.getScene()
       if (scene) {
-        // Update scene dimensions and recenter sphere
-        scene.updateScreenSize(window.innerWidth, window.innerHeight)
+        // Use renderer dimensions for consistency (these are the actual rendering dimensions)
+        scene.updateScreenSize(app.renderer.width, app.renderer.height)
       }
     }
   }, 100)

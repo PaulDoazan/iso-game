@@ -26,8 +26,14 @@ export class Game {
   private createScene() {
     if (!this.app) return
 
+    // Use renderer dimensions to ensure consistency across all devices
+    // This ensures correct proportions even when not in fullscreen on mobile
+    // The renderer dimensions are the actual dimensions being used for rendering
+    const width = this.app.renderer.width
+    const height = this.app.renderer.height
+    
     // Create top-down scene - it will fill the screen and handle its own positioning
-    this.scene = new TopDownScene(this.app.screen.width, this.app.screen.height)
+    this.scene = new TopDownScene(width, height)
     
     this.app.stage.addChild(this.scene)
   }
