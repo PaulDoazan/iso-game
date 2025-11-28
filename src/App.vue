@@ -14,6 +14,17 @@ onMounted(async () => {
   window.addEventListener('resize', handleResize)
   window.addEventListener('orientationchange', handleResize)
   
+  // Handle visualViewport resize (accounts for browser UI on mobile)
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', handleResize)
+    window.visualViewport.addEventListener('scroll', handleResize)
+  }
+  
+  // Initial correction after a short delay to account for browser UI settling
+  setTimeout(() => {
+    handleResize()
+  }, 200)
+  
   // Try to lock orientation to landscape on mobile (if supported)
   if (screen.orientation && 'lock' in screen.orientation) {
     (screen.orientation as any).lock('landscape').catch(() => {
@@ -26,6 +37,10 @@ onMounted(async () => {
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
   window.removeEventListener('orientationchange', handleResize)
+  if (window.visualViewport) {
+    window.visualViewport.removeEventListener('resize', handleResize)
+    window.visualViewport.removeEventListener('scroll', handleResize)
+  }
 })
 
 const handleResize = () => {
@@ -33,8 +48,22 @@ const handleResize = () => {
   setTimeout(() => {
     const app = game.getApp()
     if (app && canvasRef.value) {
-      // Resize renderer to match window (resizeTo: window handles this, but we ensure it's synced)
-      app.renderer.resize(window.innerWidth, window.innerHeight)
+      // Get actual visible dimensions, accounting for browser UI on mobile
+      let width: number
+      let height: number
+      
+      if (window.visualViewport) {
+        // Use visualViewport if available (excludes browser UI)
+        width = window.visualViewport.width
+        height = window.visualViewport.height
+      } else {
+        // Fallback to canvas client dimensions (actual rendered size)
+        width = canvasRef.value.clientWidth || window.innerWidth
+        height = canvasRef.value.clientHeight || window.innerHeight
+      }
+      
+      // Resize renderer to match actual visible dimensions
+      app.renderer.resize(width, height)
       const scene = game.getScene()
       if (scene) {
         // Use renderer dimensions for consistency (these are the actual rendering dimensions)

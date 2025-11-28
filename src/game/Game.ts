@@ -9,10 +9,28 @@ export class Game {
     // Create PixiJS application
     this.app = new Application()
     
+    // Get actual visible dimensions, accounting for browser UI on mobile
+    const getVisibleDimensions = () => {
+      // Use visualViewport if available (excludes browser UI)
+      if (window.visualViewport) {
+        return {
+          width: window.visualViewport.width,
+          height: window.visualViewport.height
+        }
+      }
+      // Fallback to canvas client dimensions (actual rendered size)
+      return {
+        width: canvas.clientWidth || window.innerWidth,
+        height: canvas.clientHeight || window.innerHeight
+      }
+    }
+    
+    const dimensions = getVisibleDimensions()
+    
     await this.app.init({
       canvas,
-      width: window.innerWidth,
-      height: window.innerHeight,
+      width: dimensions.width,
+      height: dimensions.height,
       backgroundColor: 0x1a1a1a,
       antialias: true,
       resizeTo: window,
