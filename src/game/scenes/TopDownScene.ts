@@ -1,12 +1,12 @@
 import { Container, Graphics } from 'pixi.js'
-import { Sphere } from '../entities/Sphere'
+import { Character3D } from '../entities/Character3D'
 import * as PF from 'pathfinding'
 
 export class TopDownScene extends Container {
   private gridSize: number = 20
   private extendedGridSize: number = 0
   private tileSize: number = 64
-  private sphere!: Sphere
+  private character!: Character3D
   private pathfinder: PF.AStarFinder
   private grid: PF.Grid
   private screenWidth: number = 0
@@ -37,7 +37,7 @@ export class TopDownScene extends Container {
     this.grid = new PF.Grid(matrix)
 
     this.createGrid()
-    this.createSphere()
+    this.createCharacter()
     this.updateScenePosition(true) // Set initial position immediately
   }
 
@@ -60,13 +60,13 @@ export class TopDownScene extends Container {
     }
   }
 
-  private createSphere() {
-    this.sphere = new Sphere()
+  private createCharacter() {
+    this.character = new Character3D()
     // Start at center of extended grid (in world coordinates)
     const centerX = (this.extendedGridSize / 2) * this.tileSize
     const centerY = (this.extendedGridSize / 2) * this.tileSize
-    this.sphere.setPosition(centerX, centerY)
-    this.addChild(this.sphere)
+    this.character.setPosition(centerX, centerY)
+    this.addChild(this.character)
   }
 
   /**
@@ -85,8 +85,8 @@ export class TopDownScene extends Container {
     const clampedGridX = Math.max(0, Math.min(this.extendedGridSize - 1, gridX))
     const clampedGridY = Math.max(0, Math.min(this.extendedGridSize - 1, gridY))
     
-    // Get current sphere position in grid coordinates
-    const currentPos = this.sphere.getPosition()
+    // Get current character position in grid coordinates
+    const currentPos = this.character.getPosition()
     const startGridX = Math.max(0, Math.min(this.extendedGridSize - 1, Math.floor(currentPos.x / this.tileSize)))
     const startGridY = Math.max(0, Math.min(this.extendedGridSize - 1, Math.floor(currentPos.y / this.tileSize)))
     
@@ -98,23 +98,23 @@ export class TopDownScene extends Container {
       // Convert grid coordinates back to world coordinates for movement
       const targetWorldX = clampedGridX * this.tileSize + this.tileSize / 2
       const targetWorldY = clampedGridY * this.tileSize + this.tileSize / 2
-      this.sphere.moveTo(targetWorldX, targetWorldY)
+      this.character.moveTo(targetWorldX, targetWorldY)
     }
   }
 
   /**
-   * Update scene position to keep sphere centered on screen
+   * Update scene position to keep character centered on screen
    */
   private updateScenePosition(immediate: boolean = false) {
-    const spherePos = this.sphere.getPosition()
+    const characterPos = this.character.getPosition()
     
-    // Sphere's position in the scene is its world position (direct mapping)
-    this.sphere.x = spherePos.x
-    this.sphere.y = spherePos.y
+    // Character's position in the scene is its world position (direct mapping)
+    this.character.x = characterPos.x
+    this.character.y = characterPos.y
     
-    // Calculate target scene position so sphere appears at screen center
-    this.targetSceneX = this.screenWidth / 2 - spherePos.x
-    this.targetSceneY = this.screenHeight / 2 - spherePos.y
+    // Calculate target scene position so character appears at screen center
+    this.targetSceneX = this.screenWidth / 2 - characterPos.x
+    this.targetSceneY = this.screenHeight / 2 - characterPos.y
     
     if (immediate) {
       // Set position immediately (for initial setup)
@@ -135,24 +135,24 @@ export class TopDownScene extends Container {
    * Update the scene (call in game loop)
    */
   update() {
-    // Update sphere's smooth movement
-    const sphereMoving = this.sphere.update()
+    // Update character's smooth movement
+    const characterMoving = this.character.update()
     
-    // Continuously update scene position to keep sphere centered as it moves
-    // Always update the target position when sphere is moving
-    if (sphereMoving) {
-      const spherePos = this.sphere.getPosition()
+    // Continuously update scene position to keep character centered as it moves
+    // Always update the target position when character is moving
+    if (characterMoving) {
+      const characterPos = this.character.getPosition()
       
-      // Update sphere's position in the scene (direct world coordinate mapping)
-      this.sphere.x = spherePos.x
-      this.sphere.y = spherePos.y
+      // Update character's position in the scene (direct world coordinate mapping)
+      this.character.x = characterPos.x
+      this.character.y = characterPos.y
       
-      // Continuously update target scene position to keep sphere centered
-      this.targetSceneX = this.screenWidth / 2 - spherePos.x
-      this.targetSceneY = this.screenHeight / 2 - spherePos.y
+      // Continuously update target scene position to keep character centered
+      this.targetSceneX = this.screenWidth / 2 - characterPos.x
+      this.targetSceneY = this.screenHeight / 2 - characterPos.y
       this.isPanning = true
     } else if (this.isPanning) {
-      // Update scene position one more time when sphere stops moving
+      // Update scene position one more time when character stops moving
       this.updateScenePosition()
     }
     
@@ -200,12 +200,17 @@ export class TopDownScene extends Container {
       this.grid = new PF.Grid(matrix)
     }
     
-    // Recenter sphere by updating scene position
+    // Recenter character by updating scene position
     this.updateScenePosition(true)
   }
 
-  getSphere(): Sphere {
-    return this.sphere
+  getCharacter(): Character3D {
+    return this.character
+  }
+
+  // Keep for backward compatibility
+  getSphere(): Character3D {
+    return this.character
   }
 }
 
