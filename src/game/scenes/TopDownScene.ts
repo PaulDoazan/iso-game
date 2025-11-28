@@ -62,9 +62,9 @@ export class TopDownScene extends Container {
 
   private createSphere() {
     this.sphere = new Sphere()
-    // Start at center of grid (in world coordinates)
-    const centerX = (this.gridSize / 2) * this.tileSize
-    const centerY = (this.gridSize / 2) * this.tileSize
+    // Start at center of extended grid (in world coordinates)
+    const centerX = (this.extendedGridSize / 2) * this.tileSize
+    const centerY = (this.extendedGridSize / 2) * this.tileSize
     this.sphere.setPosition(centerX, centerY)
     this.addChild(this.sphere)
   }
