@@ -14,7 +14,7 @@ export class Character3D extends Container {
   private targetX: number = 0
   private targetY: number = 0
   private isMoving: boolean = false
-  private moveSpeed: number = 0.03 // Movement speed (0-1)
+  private moveSpeed: number = 6000 // Constant movement speed (pixels per second)
   
   // Rotation state for smooth rotation
   private currentRotationY: number = 0 // Current rotation angle in radians
@@ -263,9 +263,10 @@ export class Character3D extends Container {
 
   /**
    * Update the character's position and rotation (call this in the game loop)
+   * @param deltaTime Time elapsed since last frame in seconds (from ticker.deltaTime)
    * Returns true if still moving, false if reached target
    */
-  update(): boolean {
+  update(deltaTime: number = 1/60): boolean {
     this.updateRotation()
     this.renderThreeJS()
 
@@ -280,7 +281,6 @@ export class Character3D extends Container {
     // Calculate target rotation based on movement direction
     if (distance > 0.1) {
       const targetAngle = Math.atan2(dy, dx)
-      // Convert screen angle to Three.js rotation (with isometric camera offset)
       this.targetRotationY = Math.PI / 2 - targetAngle + Math.PI / 4
     }
 
@@ -291,9 +291,13 @@ export class Character3D extends Container {
       return false
     }
 
-    // Smooth position interpolation
-    this.currentX += dx * this.moveSpeed
-    this.currentY += dy * this.moveSpeed
+    // Constant speed movement - move towards target at fixed speed (time-based)
+    const moveDistance = Math.min(this.moveSpeed * deltaTime, distance)
+    const moveX = (dx / distance) * moveDistance
+    const moveY = (dy / distance) * moveDistance
+    
+    this.currentX += moveX
+    this.currentY += moveY
     
     return true
   }

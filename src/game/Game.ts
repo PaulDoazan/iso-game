@@ -72,8 +72,11 @@ export class Game {
     if (!this.app || !this.scene) return
 
     // Game loop for smooth animations
-    this.app.ticker.add(() => {
-      this.scene!.update()
+    // Use ticker deltaTime for time-based movement (ensures consistent speed)
+    this.app.ticker.add((ticker) => {
+      // ticker.deltaTime is in milliseconds, convert to seconds
+      const deltaTime = ticker.deltaTime / 1000
+      this.scene!.update(deltaTime)
     })
   }
 

@@ -11,12 +11,8 @@ export class TopDownScene extends Container {
   private grid: PF.Grid
   private screenWidth: number = 0
   private screenHeight: number = 0
-  private targetSceneX: number = 0
-  private targetSceneY: number = 0
   private currentSceneX: number = 0
   private currentSceneY: number = 0
-  private isPanning: boolean = false
-  private panSpeed: number = 0.05
 
   constructor(screenWidth: number, screenHeight: number) {
     super()
@@ -38,7 +34,7 @@ export class TopDownScene extends Container {
 
     this.createGrid()
     this.createCharacter()
-    this.updateScenePosition(true) // Set initial position immediately
+    this.updateScenePosition() // Set initial position
   }
 
   private createGrid() {
@@ -105,77 +101,32 @@ export class TopDownScene extends Container {
   /**
    * Update scene position to keep character centered on screen
    */
-  private updateScenePosition(immediate: boolean = false) {
+  private updateScenePosition() {
     const characterPos = this.character.getPosition()
     
     // Character's position in the scene is its world position (direct mapping)
     this.character.x = characterPos.x
     this.character.y = characterPos.y
     
-    // Calculate target scene position so character appears at screen center
-    this.targetSceneX = this.screenWidth / 2 - characterPos.x
-    this.targetSceneY = this.screenHeight / 2 - characterPos.y
-    
-    if (immediate) {
-      // Set position immediately (for initial setup)
-      this.currentSceneX = this.targetSceneX
-      this.currentSceneY = this.targetSceneY
-      this.x = this.currentSceneX
-      this.y = this.currentSceneY
-      this.isPanning = false
-    } else {
-      // Start panning if not already at target
-      if (Math.abs(this.targetSceneX - this.currentSceneX) > 0.1 || Math.abs(this.targetSceneY - this.currentSceneY) > 0.1) {
-        this.isPanning = true
-      }
-    }
+    // Calculate scene position so character appears at screen center
+    // Update immediately to match character's constant movement
+    this.currentSceneX = this.screenWidth / 2 - characterPos.x
+    this.currentSceneY = this.screenHeight / 2 - characterPos.y
+    this.x = this.currentSceneX
+    this.y = this.currentSceneY
   }
 
   /**
    * Update the scene (call in game loop)
+   * @param deltaTime Time elapsed since last frame in seconds (from ticker.deltaTime)
    */
-  update() {
-    // Update character's smooth movement
-    const characterMoving = this.character.update()
+  update(deltaTime: number = 1/60) {
+    // Update character movement (time-based for consistent speed)
+    this.character.update(deltaTime)
     
-    // Continuously update scene position to keep character centered as it moves
-    // Always update the target position when character is moving
-    if (characterMoving) {
-      const characterPos = this.character.getPosition()
-      
-      // Update character's position in the scene (direct world coordinate mapping)
-      this.character.x = characterPos.x
-      this.character.y = characterPos.y
-      
-      // Continuously update target scene position to keep character centered
-      this.targetSceneX = this.screenWidth / 2 - characterPos.x
-      this.targetSceneY = this.screenHeight / 2 - characterPos.y
-      this.isPanning = true
-    } else if (this.isPanning) {
-      // Update scene position one more time when character stops moving
-      this.updateScenePosition()
-    }
-    
-    // Pan the scene smoothly
-    if (this.isPanning) {
-      const dx = this.targetSceneX - this.currentSceneX
-      const dy = this.targetSceneY - this.currentSceneY
-      const distance = Math.sqrt(dx * dx + dy * dy)
-
-      if (distance < 0.1) {
-        // Reached target
-        this.currentSceneX = this.targetSceneX
-        this.currentSceneY = this.targetSceneY
-        this.isPanning = false
-      } else {
-        // Smooth interpolation
-        this.currentSceneX += dx * this.panSpeed
-        this.currentSceneY += dy * this.panSpeed
-      }
-      
-      this.x = this.currentSceneX
-      this.y = this.currentSceneY
-    }
+    // Update scene position immediately to keep character centered
+    // This ensures scene follows character at constant speed (no interpolation)
+    this.updateScenePosition()
   }
 
   /**
@@ -201,7 +152,7 @@ export class TopDownScene extends Container {
     }
     
     // Recenter character by updating scene position
-    this.updateScenePosition(true)
+    this.updateScenePosition()
   }
 
   getCharacter(): Character3D {
