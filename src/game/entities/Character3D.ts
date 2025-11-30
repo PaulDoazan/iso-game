@@ -29,6 +29,10 @@ export class Character3D extends Container {
   private animationMixer: THREE.AnimationMixer | null = null
   private clock: THREE.Clock
   
+  // Leg references for walking animation (Groups that contain the leg meshes)
+  private leftLeg: THREE.Group | null = null
+  private rightLeg: THREE.Group | null = null
+  
   // For rendering Three.js to PixiJS
   private threeCanvas: HTMLCanvasElement
   private threeTexture: Texture
@@ -147,15 +151,25 @@ export class Character3D extends Container {
     const legGeometry = new THREE.CylinderGeometry(0.2, 0.2, 0.8, 8)
     const legMaterial = new THREE.MeshStandardMaterial({ color: 0x2c3e50 })
     
-    // Left leg
-    const leftLeg = new THREE.Mesh(legGeometry, legMaterial)
-    leftLeg.position.set(-0.3, -0.4, 0)
-    group.add(leftLeg)
+    // Left leg - use a group so rotation happens at the top (hip joint)
+    const leftLegGroup = new THREE.Group()
+    leftLegGroup.position.set(-0.3, 0, 0) // Position at hip joint (top of leg)
+    const leftLegMesh = new THREE.Mesh(legGeometry, legMaterial)
+    // Offset mesh downward so its top is at the group origin (pivot point)
+    leftLegMesh.position.set(0, -0.4, 0) // Half the leg height (0.8/2 = 0.4)
+    leftLegGroup.add(leftLegMesh)
+    group.add(leftLegGroup)
+    this.leftLeg = leftLegGroup
     
-    // Right leg
-    const rightLeg = new THREE.Mesh(legGeometry, legMaterial)
-    rightLeg.position.set(0.3, -0.4, 0)
-    group.add(rightLeg)
+    // Right leg - use a group so rotation happens at the top (hip joint)
+    const rightLegGroup = new THREE.Group()
+    rightLegGroup.position.set(0.3, 0, 0) // Position at hip joint (top of leg)
+    const rightLegMesh = new THREE.Mesh(legGeometry, legMaterial)
+    // Offset mesh downward so its top is at the group origin (pivot point)
+    rightLegMesh.position.set(0, -0.4, 0) // Half the leg height (0.8/2 = 0.4)
+    rightLegGroup.add(rightLegMesh)
+    group.add(rightLegGroup)
+    this.rightLeg = rightLegGroup
     
     // Eyes
     const eyeGeometry = new THREE.SphereGeometry(0.08, 8, 8)
@@ -211,8 +225,26 @@ export class Character3D extends Container {
     const time = this.clock.getElapsedTime()
     if (this.isMoving) {
       this.character.position.y = Math.sin(time * 5) * 0.1
+      
+      // Animate legs for walking motion
+      if (this.leftLeg && this.rightLeg) {
+        // Walking animation: alternate leg movement
+        // Use sine wave with phase offset to create alternating motion
+        const walkSpeed = 12 // Speed of leg movement (1.5x faster)
+        const legSwingAngle = Math.PI / 6 // 30 degrees swing
+        
+        // Left leg swings forward when right leg is back, and vice versa
+        this.leftLeg.rotation.x = Math.sin(time * walkSpeed) * legSwingAngle
+        this.rightLeg.rotation.x = Math.sin(time * walkSpeed + Math.PI) * legSwingAngle
+      }
     } else {
       this.character.position.y = 0
+      
+      // Reset legs to neutral position when not moving
+      if (this.leftLeg && this.rightLeg) {
+        this.leftLeg.rotation.x = 0
+        this.rightLeg.rotation.x = 0
+      }
     }
     
     // Render Three.js scene
