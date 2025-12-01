@@ -15,6 +15,8 @@ export class Character3D extends Container {
   private targetY: number = 0
   private isMoving: boolean = false
   private moveSpeed: number = 6000 // Constant movement speed (pixels per second)
+  private path: Array<{ x: number; y: number }> = [] // Path waypoints to follow
+  private currentPathIndex: number = 0 // Current waypoint index in path
   
   // Rotation state for smooth rotation
   private currentRotationY: number = 0 // Current rotation angle in radians
@@ -277,6 +279,8 @@ export class Character3D extends Container {
     this.targetX = x
     this.targetY = y
     this.isMoving = true
+    this.path = [] // Clear path when using direct movement
+    this.currentPathIndex = 0
     
     // Calculate target rotation to face the new direction
     const dx = x - this.currentX
@@ -284,6 +288,29 @@ export class Character3D extends Container {
     if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1) {
       const targetAngle = Math.atan2(dy, dx)
       this.targetRotationY = Math.PI / 2 - targetAngle + Math.PI / 4
+    }
+  }
+
+  /**
+   * Move the character along a path (array of waypoints)
+   * This is used for pathfinding to navigate around obstacles
+   */
+  moveAlongPath(path: Array<[number, number]>, tileSize: number) {
+    if (path.length === 0) return
+    
+    // Convert grid coordinates to world coordinates
+    this.path = path.map(([gridX, gridY]) => ({
+      x: gridX * tileSize + tileSize / 2,
+      y: gridY * tileSize + tileSize / 2
+    }))
+    
+    this.currentPathIndex = 0
+    this.isMoving = true
+    
+    // Start moving to first waypoint
+    if (this.path.length > 0) {
+      this.targetX = this.path[0].x
+      this.targetY = this.path[0].y
     }
   }
 
@@ -313,8 +340,20 @@ export class Character3D extends Container {
     if (distance < 0.1) {
       this.currentX = this.targetX
       this.currentY = this.targetY
-      this.isMoving = false
-      return false
+      
+      // If following a path, move to next waypoint
+      if (this.path.length > 0 && this.currentPathIndex < this.path.length - 1) {
+        this.currentPathIndex++
+        this.targetX = this.path[this.currentPathIndex].x
+        this.targetY = this.path[this.currentPathIndex].y
+        return true // Continue moving to next waypoint
+      } else {
+        // Reached end of path or no path
+        this.isMoving = false
+        this.path = []
+        this.currentPathIndex = 0
+        return false
+      }
     }
 
     // Constant speed movement - move towards target at fixed speed (time-based)
