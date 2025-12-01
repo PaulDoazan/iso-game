@@ -31,7 +31,7 @@ export class Game {
       canvas,
       width: dimensions.width,
       height: dimensions.height,
-      backgroundColor: 0x1a1a1a,
+      backgroundColor: 0x4a90e2, // Blue water color
       antialias: true,
       resizeTo: window,
     })

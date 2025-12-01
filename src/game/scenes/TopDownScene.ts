@@ -42,6 +42,9 @@ export class TopDownScene extends Container {
 
   private createGrid() {
     // Create top-down grid tiles - make grid large enough to fill screen
+    // Light sand color for island theme
+    const sandColor = 0xf4e4bc
+    
     for (let x = 0; x < this.extendedGridSize; x++) {
       for (let y = 0; y < this.extendedGridSize; y++) {
         const tile = new Graphics()
@@ -49,10 +52,9 @@ export class TopDownScene extends Container {
         const tileX = x * this.tileSize
         const tileY = y * this.tileSize
         
-        // Draw a square tile
+        // Draw a square tile with light sand color, no border
         tile.rect(tileX, tileY, this.tileSize, this.tileSize)
-        tile.fill(0x2c3e50)
-        tile.stroke({ width: 1, color: 0x34495e })
+        tile.fill(sandColor)
         
         this.addChild(tile)
       }
@@ -98,15 +100,22 @@ export class TopDownScene extends Container {
         }
       }
       
-      // Create visual obstacle
-      const obstacle = new Graphics()
+      // Randomly choose obstacle type: rocks (40%), herbs (30%), trees (30%)
+      const obstacleType = Math.random()
       const worldX = gridX * this.tileSize
       const worldY = gridY * this.tileSize
       
-      // Draw obstacle as a square tile (same size as grid tiles)
-      obstacle.rect(worldX, worldY, this.tileSize, this.tileSize)
-      obstacle.fill(0x8b4513) // Brown color for obstacles
-      obstacle.stroke({ width: 2, color: 0x654321 }) // Darker brown border
+      let obstacle: Graphics
+      if (obstacleType < 0.4) {
+        // Rock
+        obstacle = this.createRock(worldX, worldY)
+      } else if (obstacleType < 0.7) {
+        // Herb
+        obstacle = this.createHerb(worldX, worldY)
+      } else {
+        // Small tree
+        obstacle = this.createSmallTree(worldX, worldY)
+      }
       
       this.addChild(obstacle)
       this.obstacles.push(obstacle)
@@ -116,6 +125,97 @@ export class TopDownScene extends Container {
     
     // Update pathfinding grid with obstacles
     this.grid = new PF.Grid(matrix)
+  }
+
+  /**
+   * Create a rock obstacle
+   */
+  private createRock(x: number, y: number): Graphics {
+    const rock = new Graphics()
+    const centerX = x + this.tileSize / 2
+    const centerY = y + this.tileSize / 2
+    const maxSize = this.tileSize * 0.85 // Much larger to fill the cell
+    
+    // Rock colors (gray to brown)
+    const rockColors = [0x696969, 0x808080, 0x8b7355, 0x6b5b4d]
+    const rockColor = rockColors[Math.floor(Math.random() * rockColors.length)]
+    
+    // Draw irregular rock shape (polygon) that fills most of the cell
+    const points: number[] = []
+    const numPoints = 6 + Math.floor(Math.random() * 4) // 6-9 points for irregular shape
+    for (let i = 0; i < numPoints; i++) {
+      const angle = (i / numPoints) * Math.PI * 2
+      const radius = maxSize * (0.7 + Math.random() * 0.3) // Fill 70-100% of available space
+      points.push(centerX + Math.cos(angle) * radius)
+      points.push(centerY + Math.sin(angle) * radius)
+    }
+    
+    rock.poly(points)
+    rock.fill(rockColor)
+    rock.stroke({ width: 1, color: 0x555555 })
+    
+    return rock
+  }
+
+  /**
+   * Create a herb/plant obstacle
+   */
+  private createHerb(x: number, y: number): Graphics {
+    const herb = new Graphics()
+    const centerX = x + this.tileSize / 2
+    const centerY = y + this.tileSize / 2
+    
+    // Herb colors (green variations)
+    const herbColors = [0x228b22, 0x32cd32, 0x3cb371, 0x2e8b57]
+    const herbColor = herbColors[Math.floor(Math.random() * herbColors.length)]
+    
+    // Draw herb clusters that fill the cell better
+    const numClusters = 3 + Math.floor(Math.random() * 3) // 3-5 clusters for better coverage
+    for (let i = 0; i < numClusters; i++) {
+      const offsetX = (Math.random() - 0.5) * this.tileSize * 0.7
+      const offsetY = (Math.random() - 0.5) * this.tileSize * 0.7
+      // Larger clusters to fill the cell better
+      const clusterSize = this.tileSize * (0.25 + Math.random() * 0.2) // 25-45% of tile size
+      
+      herb.circle(centerX + offsetX, centerY + offsetY, clusterSize)
+      herb.fill(herbColor)
+    }
+    
+    return herb
+  }
+
+  /**
+   * Create a small tree obstacle
+   */
+  private createSmallTree(x: number, y: number): Graphics {
+    const tree = new Graphics()
+    const centerX = x + this.tileSize / 2
+    const centerY = y + this.tileSize / 2
+    
+    // Tree trunk (brown)
+    const trunkWidth = this.tileSize * 0.15
+    const trunkHeight = this.tileSize * 0.3
+    const trunkX = centerX - trunkWidth / 2
+    const trunkY = centerY + this.tileSize * 0.1
+    
+    tree.rect(trunkX, trunkY, trunkWidth, trunkHeight)
+    tree.fill(0x8b4513) // Brown trunk
+    tree.stroke({ width: 1, color: 0x654321 })
+    
+    // Tree foliage (green circle/ellipse)
+    const foliageSize = this.tileSize * 0.5
+    const foliageY = centerY - this.tileSize * 0.1
+    
+    // Tree colors (green variations)
+    const treeColors = [0x228b22, 0x2d5016, 0x3d6b2a, 0x2e7d32]
+    const treeColor = treeColors[Math.floor(Math.random() * treeColors.length)]
+    
+    // Draw foliage as slightly irregular circle
+    tree.circle(centerX, foliageY, foliageSize)
+    tree.fill(treeColor)
+    tree.stroke({ width: 1, color: 0x1a5a1a })
+    
+    return tree
   }
 
   private createCharacter() {

@@ -110,21 +110,21 @@ export class Character3D extends Container {
     
     // Body (cylinder)
     const bodyGeometry = new THREE.CylinderGeometry(0.4, 0.5, 1.2, 8)
-    const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0x3498db })
+    const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0x00bfff }) // Vibrant cyan blue
     const body = new THREE.Mesh(bodyGeometry, bodyMaterial)
     body.position.y = 0.6
     group.add(body)
     
     // Head (sphere)
     const headGeometry = new THREE.SphereGeometry(0.5, 16, 16)
-    const headMaterial = new THREE.MeshStandardMaterial({ color: 0xffdbac })
+    const headMaterial = new THREE.MeshStandardMaterial({ color: 0xffd700 }) // Vibrant gold/yellow
     const head = new THREE.Mesh(headGeometry, headMaterial)
     head.position.y = 1.5
     group.add(head)
     
     // Hat (cylinder)
     const hatGeometry = new THREE.CylinderGeometry(0.5, 0.5, 0.3, 8)
-    const hatMaterial = new THREE.MeshStandardMaterial({ color: 0xe74c3c })
+    const hatMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 }) // Pure red
     const hat = new THREE.Mesh(hatGeometry, hatMaterial)
     hat.position.y = 1.8
     group.add(hat)
@@ -137,7 +137,7 @@ export class Character3D extends Container {
     
     // Arms
     const armGeometry = new THREE.CylinderGeometry(0.15, 0.15, 0.8, 8)
-    const armMaterial = new THREE.MeshStandardMaterial({ color: 0x2980b9 })
+    const armMaterial = new THREE.MeshStandardMaterial({ color: 0x00bfff }) // Vibrant cyan blue
     
     // Left arm
     const leftArm = new THREE.Mesh(armGeometry, armMaterial)
@@ -153,7 +153,7 @@ export class Character3D extends Container {
     
     // Legs
     const legGeometry = new THREE.CylinderGeometry(0.2, 0.2, 0.8, 8)
-    const legMaterial = new THREE.MeshStandardMaterial({ color: 0x2c3e50 })
+    const legMaterial = new THREE.MeshStandardMaterial({ color: 0x7f8c8d }) // Brighter gray
     
     // Left leg - use a group so rotation happens at the top (hip joint)
     const leftLegGroup = new THREE.Group()
@@ -309,8 +309,8 @@ export class Character3D extends Container {
     
     // Start moving to first waypoint
     if (this.path.length > 0) {
-      this.targetX = this.path[0].x
-      this.targetY = this.path[0].y
+      this.targetX = this.path[0]?.x ?? 0
+      this.targetY = this.path[0]?.y ?? 0
     }
   }
 
@@ -344,8 +344,8 @@ export class Character3D extends Container {
       // If following a path, move to next waypoint
       if (this.path.length > 0 && this.currentPathIndex < this.path.length - 1) {
         this.currentPathIndex++
-        this.targetX = this.path[this.currentPathIndex].x
-        this.targetY = this.path[this.currentPathIndex].y
+        this.targetX = this.path[this.currentPathIndex]?.x ?? 0
+        this.targetY = this.path[this.currentPathIndex]?.y ?? 0
         return true // Continue moving to next waypoint
       } else {
         // Reached end of path or no path
