@@ -5,7 +5,7 @@ import * as PF from 'pathfinding'
 export class TopDownScene extends Container {
   private gridSize: number = 20
   private extendedGridSize: number = 0
-  private tileSize: number = 64
+  private tileSize: number = 64 / 1.5
   private character!: Character3D
   private pathfinder: PF.AStarFinder
   private grid: PF.Grid

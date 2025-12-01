@@ -77,6 +77,8 @@ export class Character3D extends Container {
     
     // Create 3D character
     this.character = this.create3DCharacter()
+    // Scale character down by 1.5
+    this.character.scale.set(1 / 1.5, 1 / 1.5, 1 / 1.5)
     this.scene.add(this.character)
     
     // Apply initial rotation

@@ -52,3 +52,4 @@ Once you have a sprite sheet:
 - **Top-Down Character Base** (itch.io) - Simple but effective
 - **2D Character Sprite Pack 128x128** (itch.io) - 94 animations!
 
+
