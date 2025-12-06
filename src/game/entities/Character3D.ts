@@ -56,7 +56,7 @@ export class Character3D extends Container {
     this.camera.position.set(8, 12, 8)
     this.camera.lookAt(0, 0, 0)
     
-    // Initialize rotation state
+    // Initialize rotation state - start at 0 degrees
     this.currentRotationY = 0
     this.targetRotationY = 0
     
@@ -273,55 +273,44 @@ export class Character3D extends Container {
   }
 
   /**
-   * Calculate rotation angle from screen-space movement direction for isometric view
-   * Converts screen movement to align with isometric grid lines (diamond tile edges)
+   * Calculate rotation angle from screen-space movement direction
+   * Isometric 4 directions: topRight (0°), topLeft (90°), downLeft (180°), downRight (270°)
    */
   private calculateIsoRotation(dx: number, dy: number): number {
-    // In isometric projection, the character moves in screen space (dx, dy)
-    // but needs to rotate in 3D world space to face the movement direction
-    // 
-    // The camera is positioned at (8, 12, 8) looking at (0, 0, 0)
-    // This creates an isometric view where:
-    // - Screen X movement corresponds to diagonal movement in world XZ plane
-    // - Screen Y movement corresponds to diagonal movement in world XZ plane
-    //
-    // To convert screen movement to world rotation:
-    // 1. Screen movement (dx, dy) represents direction along diamond tile edges
-    // 2. Convert to isometric grid direction (isoX, isoY)
-    // 3. Map to world XZ direction
-    // 4. Calculate rotation angle
-    
     // Normalize movement direction
     const length = Math.sqrt(dx * dx + dy * dy)
     if (length < 0.1) return this.targetRotationY
     
-    const normDx = dx / length
-    const normDy = dy / length
+    // In isometric view, the 4 directions are:
+    // topRight: dx > 0, dy < 0 (moving right and up)
+    // topLeft: dx < 0, dy < 0 (moving left and up)
+    // downLeft: dx < 0, dy > 0 (moving left and down)
+    // downRight: dx > 0, dy > 0 (moving right and down)
     
-    // Convert screen direction to isometric grid direction
-    // From IsoUtils: screen x = (isoX - isoY) * tileSize, screen y = (isoX + isoY) * tileSize / 2
-    // So for unit movement: isoX = (screenX/tileSize + screenY/(tileSize/2)) / 2
-    // For normalized direction, we can work with the ratios
-    // isoX component contributes: (1, 0.5) in screen space
-    // isoY component contributes: (-1, 0.5) in screen space
-    
-    // Decompose screen direction into isoX and isoY components
-    // normDx = isoX - isoY (normalized)
-    // normDy = (isoX + isoY) / 2 (normalized, accounting for compression)
-    // Solving: isoX = (normDx + 2*normDy) / 2, isoY = (2*normDy - normDx) / 2
-    
-    const isoX = (normDx + 2 * normDy) / 2
-    const isoY = (2 * normDy - normDx) / 2
-    
-    // Map isometric grid direction to world XZ direction
-    // In world space, isoX axis maps to (1, 0, 1) direction, isoY maps to (-1, 0, 1)
-    const worldX = isoX - isoY  // X component in world space
-    const worldZ = isoX + isoY  // Z component in world space
-    
-    // Calculate rotation angle in world space (around Y axis)
-    const worldAngle = Math.atan2(worldZ, worldX)
-    
-    return worldAngle
+    // Determine which isometric direction based on dx and dy signs
+    // Add 180 degrees (π) to reverse direction so character faces forward
+    if (dx > 0 && dy < 0) {
+      // topRight: 0 + 180 = 180 degrees
+      return Math.PI
+    } else if (dx < 0 && dy < 0) {
+      // topLeft: 90 + 180 = 270 degrees
+      return 3 * Math.PI / 2
+    } else if (dx < 0 && dy > 0) {
+      // downLeft: 180 + 180 = 360 degrees (0)
+      return 0
+    } else if (dx > 0 && dy > 0) {
+      // downRight: 270 + 180 = 450 degrees (90)
+      return Math.PI / 2
+    } else {
+      // Edge cases: use dominant axis, add 180 degrees
+      const absDx = Math.abs(dx)
+      const absDy = Math.abs(dy)
+      if (absDx > absDy) {
+        return dx > 0 ? Math.PI : 0
+      } else {
+        return dy > 0 ? (Math.PI / 2) : (3 * Math.PI / 2)
+      }
+    }
   }
 
   /**
