@@ -1,9 +1,9 @@
 import { Application } from 'pixi.js'
-import { TopDownScene } from './scenes/TopDownScene'
+import { IsoScene } from './scenes/IsoScene'
 
 export class Game {
   private app: Application | null = null
-  private scene: TopDownScene | null = null
+  private scene: IsoScene | null = null
 
   async init(canvas: HTMLCanvasElement) {
     // Create PixiJS application
@@ -50,8 +50,8 @@ export class Game {
     const width = this.app.renderer.width
     const height = this.app.renderer.height
     
-    // Create top-down scene - it will fill the screen and handle its own positioning
-    this.scene = new TopDownScene(width, height)
+    // Create isometric scene - it will fill the screen and handle its own positioning
+    this.scene = new IsoScene(width, height)
     
     this.app.stage.addChild(this.scene)
   }
@@ -84,7 +84,7 @@ export class Game {
     return this.app
   }
 
-  getScene(): TopDownScene | null {
+  getScene(): IsoScene | null {
     return this.scene
   }
 }

@@ -273,6 +273,58 @@ export class Character3D extends Container {
   }
 
   /**
+   * Calculate rotation angle from screen-space movement direction for isometric view
+   * Converts screen movement to align with isometric grid lines (diamond tile edges)
+   */
+  private calculateIsoRotation(dx: number, dy: number): number {
+    // In isometric projection, the character moves in screen space (dx, dy)
+    // but needs to rotate in 3D world space to face the movement direction
+    // 
+    // The camera is positioned at (8, 12, 8) looking at (0, 0, 0)
+    // This creates an isometric view where:
+    // - Screen X movement corresponds to diagonal movement in world XZ plane
+    // - Screen Y movement corresponds to diagonal movement in world XZ plane
+    //
+    // To convert screen movement to world rotation:
+    // 1. Screen movement (dx, dy) represents direction along diamond tile edges
+    // 2. Convert to isometric grid direction (isoX, isoY)
+    // 3. Map to world XZ direction
+    // 4. Calculate rotation angle
+    
+    // Normalize movement direction
+    const length = Math.sqrt(dx * dx + dy * dy)
+    if (length < 0.1) return this.targetRotationY
+    
+    const normDx = dx / length
+    const normDy = dy / length
+    
+    // Convert screen direction to isometric grid direction
+    // From IsoUtils: screen x = (isoX - isoY) * tileSize, screen y = (isoX + isoY) * tileSize / 2
+    // So for unit movement: isoX = (screenX/tileSize + screenY/(tileSize/2)) / 2
+    // For normalized direction, we can work with the ratios
+    // isoX component contributes: (1, 0.5) in screen space
+    // isoY component contributes: (-1, 0.5) in screen space
+    
+    // Decompose screen direction into isoX and isoY components
+    // normDx = isoX - isoY (normalized)
+    // normDy = (isoX + isoY) / 2 (normalized, accounting for compression)
+    // Solving: isoX = (normDx + 2*normDy) / 2, isoY = (2*normDy - normDx) / 2
+    
+    const isoX = (normDx + 2 * normDy) / 2
+    const isoY = (2 * normDy - normDx) / 2
+    
+    // Map isometric grid direction to world XZ direction
+    // In world space, isoX axis maps to (1, 0, 1) direction, isoY maps to (-1, 0, 1)
+    const worldX = isoX - isoY  // X component in world space
+    const worldZ = isoX + isoY  // Z component in world space
+    
+    // Calculate rotation angle in world space (around Y axis)
+    const worldAngle = Math.atan2(worldZ, worldX)
+    
+    return worldAngle
+  }
+
+  /**
    * Move the character smoothly to a target world position
    */
   moveTo(x: number, y: number) {
@@ -286,23 +338,33 @@ export class Character3D extends Container {
     const dx = x - this.currentX
     const dy = y - this.currentY
     if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1) {
-      const targetAngle = Math.atan2(dy, dx)
-      this.targetRotationY = Math.PI / 2 - targetAngle + Math.PI / 4
+      this.targetRotationY = this.calculateIsoRotation(dx, dy)
     }
   }
 
   /**
    * Move the character along a path (array of waypoints)
    * This is used for pathfinding to navigate around obstacles
+   * @param path Array of waypoints in screen coordinates, or grid coordinates with tileSize
+   * @param tileSize Optional: if provided, path is treated as grid coordinates
    */
-  moveAlongPath(path: Array<[number, number]>, tileSize: number) {
+  moveAlongPath(path: Array<[number, number]> | Array<{ x: number; y: number }>, tileSize?: number) {
     if (path.length === 0) return
     
-    // Convert grid coordinates to world coordinates
-    this.path = path.map(([gridX, gridY]) => ({
-      x: gridX * tileSize + tileSize / 2,
-      y: gridY * tileSize + tileSize / 2
-    }))
+    // Convert path to screen coordinates
+    if (tileSize !== undefined && path.length > 0 && Array.isArray(path[0]) && path[0].length === 2) {
+      // Grid coordinates format: Array<[number, number]>
+      this.path = (path as Array<[number, number]>).map(([gridX, gridY]) => ({
+        x: gridX * tileSize + tileSize / 2,
+        y: gridY * tileSize + tileSize / 2
+      }))
+    } else {
+      // Screen coordinates format: Array<{ x: number; y: number }>
+      this.path = (path as Array<{ x: number; y: number }>).map((point) => ({
+        x: point.x,
+        y: point.y
+      }))
+    }
     
     this.currentPathIndex = 0
     this.isMoving = true
@@ -333,8 +395,7 @@ export class Character3D extends Container {
 
     // Calculate target rotation based on movement direction
     if (distance > 0.1) {
-      const targetAngle = Math.atan2(dy, dx)
-      this.targetRotationY = Math.PI / 2 - targetAngle + Math.PI / 4
+      this.targetRotationY = this.calculateIsoRotation(dx, dy)
     }
 
     if (distance < 0.1) {
