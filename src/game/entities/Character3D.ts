@@ -1,4 +1,4 @@
-import { Container, Sprite, Texture } from 'pixi.js'
+import { Container, Sprite, Texture, Graphics } from 'pixi.js'
 import * as THREE from 'three'
 
 /**
@@ -110,6 +110,16 @@ export class Character3D extends Container {
     this.threeSprite.scale.set(scale, scale)
     
     this.addChild(this.threeSprite)
+    
+    // Add a small red cross at character origin (0, 0) for debugging
+    const originCross = new Graphics()
+    const crossSize = 5
+    originCross.moveTo(-crossSize, 0)
+    originCross.lineTo(crossSize, 0)
+    originCross.moveTo(0, -crossSize)
+    originCross.lineTo(0, crossSize)
+    originCross.stroke({ width: 2, color: 0xff0000 }) // Red
+    this.addChild(originCross)
   }
 
   /**
