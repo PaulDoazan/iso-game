@@ -27,7 +27,6 @@ export class IsoScene extends Container {
     // Calculate tileSize based on screen dimensions to maintain consistent proportions
     // Use a base tile size that scales with screen width (aim for ~10-15 tiles visible)
     // Divide by 3 to zoom out, then multiply by 1.5 to make tiles 1.5x bigger
-    const baseTileSize = 64
     const targetTilesVisible = 12
     const calculatedTileSize = Math.max(32, Math.min(128, (screenWidth / targetTilesVisible)))
     this.tileSize = (calculatedTileSize / 3) * 1.5 // Divide by 3 for zoom, then multiply by 1.5 to make tiles 1.5x bigger
@@ -153,8 +152,9 @@ export class IsoScene extends Container {
   private createCharacter() {
     this.character = new Character3D(this.tileSize)
     // Start at center of extended grid (in isometric grid coordinates)
-    const centerIsoX = this.extendedGridSize / 2
-    const centerIsoY = this.extendedGridSize / 2
+    // Round to nearest integer to ensure character is exactly at a tile center
+    const centerIsoX = Math.round(this.extendedGridSize / 2)
+    const centerIsoY = Math.round(this.extendedGridSize / 2)
     
     // Convert isometric grid coordinates to screen coordinates
     const screenPos = IsoUtils.isoToScreen(centerIsoX, centerIsoY, this.tileSize)
@@ -314,7 +314,6 @@ export class IsoScene extends Container {
     
     // Recalculate tileSize based on new screen dimensions
     // Divide by 3 to zoom out, then multiply by 1.5 to make tiles 1.5x bigger
-    const baseTileSize = 64
     const targetTilesVisible = 12
     const calculatedTileSize = Math.max(32, Math.min(128, (width / targetTilesVisible)))
     const newTileSize = (calculatedTileSize / 3) * 1.5 // Divide by 3 for zoom, then multiply by 1.5 to make tiles 1.5x bigger

@@ -99,6 +99,7 @@ export class Character3D extends Container {
     
     // Create sprite from texture
     this.threeSprite = new Sprite(this.threeTexture)
+    // Keep anchor at center (0.5, 0.5)
     this.threeSprite.anchor.set(0.5, 0.5)
     
     // Scale sprite proportionally to tile size
@@ -108,6 +109,11 @@ export class Character3D extends Container {
     const scaleMultiplier = 4 / 1.5 // Make character 4 times bigger, but divide by 1.5 to compensate for 1.5x bigger tiles
     const scale = (tileSize / this.baseTileSize) * characterSizeRatio * scaleMultiplier
     this.threeSprite.scale.set(scale, scale)
+    
+    // Offset sprite upward by half tile height so origin (0, 0) appears at character's feet
+    // For isometric tiles, the height is tileSize / 2, so half height is tileSize / 4
+    const halfTileHeight = tileSize / 4
+    this.threeSprite.y = -halfTileHeight // Move up by half tile height
     
     this.addChild(this.threeSprite)
     
@@ -119,7 +125,7 @@ export class Character3D extends Container {
     originCross.moveTo(0, -crossSize)
     originCross.lineTo(0, crossSize)
     originCross.stroke({ width: 2, color: 0xff0000 }) // Red
-    this.addChild(originCross)
+    // this.addChild(originCross)
   }
 
   /**
