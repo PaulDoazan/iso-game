@@ -39,8 +39,9 @@ export class Character3D extends Container {
   private threeCanvas: HTMLCanvasElement
   private threeTexture: Texture
   private threeSprite: Sprite
+  private baseTileSize: number = 64 // Base tile size for scaling calculations
 
-  constructor() {
+  constructor(tileSize: number = 64) {
     super()
     
     // Initialize Three.js components
@@ -99,6 +100,15 @@ export class Character3D extends Container {
     // Create sprite from texture
     this.threeSprite = new Sprite(this.threeTexture)
     this.threeSprite.anchor.set(0.5, 0.5)
+    
+    // Scale sprite proportionally to tile size
+    // Character should be 4 times bigger relative to tile size, but divided by 1.5 to compensate for tiles being 1.5x bigger
+    // This keeps character the same absolute size while tiles are 1.5x bigger
+    const characterSizeRatio = 0.65 // Base character size relative to tile
+    const scaleMultiplier = 4 / 1.5 // Make character 4 times bigger, but divide by 1.5 to compensate for 1.5x bigger tiles
+    const scale = (tileSize / this.baseTileSize) * characterSizeRatio * scaleMultiplier
+    this.threeSprite.scale.set(scale, scale)
+    
     this.addChild(this.threeSprite)
   }
 
@@ -477,6 +487,21 @@ export class Character3D extends Container {
       this.character.scale.set(1, 1, 1)
     } catch (error) {
       console.warn('Failed to load GLTF model:', error)
+    }
+  }
+
+  /**
+   * Update character sprite scale based on new tile size
+   * This ensures the character maintains the same proportion relative to tiles
+   */
+  updateScale(tileSize: number) {
+    // Character should be 4 times bigger relative to tile size, but divided by 1.5 to compensate for tiles being 1.5x bigger
+    // This keeps character the same absolute size while tiles are 1.5x bigger
+    const characterSizeRatio = 0.65 // Base character size relative to tile
+    const scaleMultiplier = 4 / 1.5 // Make character 4 times bigger, but divide by 1.5 to compensate for 1.5x bigger tiles
+    const scale = (tileSize / this.baseTileSize) * characterSizeRatio * scaleMultiplier
+    if (this.threeSprite) {
+      this.threeSprite.scale.set(scale, scale)
     }
   }
 

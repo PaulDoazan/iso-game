@@ -24,6 +24,14 @@ export class IsoScene extends Container {
     this.screenWidth = screenWidth
     this.screenHeight = screenHeight
     
+    // Calculate tileSize based on screen dimensions to maintain consistent proportions
+    // Use a base tile size that scales with screen width (aim for ~10-15 tiles visible)
+    // Divide by 3 to zoom out, then multiply by 1.5 to make tiles 1.5x bigger
+    const baseTileSize = 64
+    const targetTilesVisible = 12
+    const calculatedTileSize = Math.max(32, Math.min(128, (screenWidth / targetTilesVisible)))
+    this.tileSize = (calculatedTileSize / 3) * 1.5 // Divide by 3 for zoom, then multiply by 1.5 to make tiles 1.5x bigger
+    
     // Calculate extended grid size to cover the entire screen when panned
     // For isometric, we need more tiles to cover the diagonal view
     this.extendedGridSize = Math.max(
@@ -143,7 +151,7 @@ export class IsoScene extends Container {
   }
 
   private createCharacter() {
-    this.character = new Character3D()
+    this.character = new Character3D(this.tileSize)
     // Start at center of extended grid (in isometric grid coordinates)
     const centerIsoX = this.extendedGridSize / 2
     const centerIsoY = this.extendedGridSize / 2
@@ -304,19 +312,49 @@ export class IsoScene extends Container {
     this.screenWidth = width
     this.screenHeight = height
     
-    // Recalculate extended grid size if needed
-    const newExtendedGridSize = Math.max(
-      this.gridSize, 
-      Math.ceil(this.screenWidth / this.tileSize) + 20,
-      Math.ceil(this.screenHeight / (this.tileSize / 2)) + 20
-    )
+    // Recalculate tileSize based on new screen dimensions
+    // Divide by 3 to zoom out, then multiply by 1.5 to make tiles 1.5x bigger
+    const baseTileSize = 64
+    const targetTilesVisible = 12
+    const calculatedTileSize = Math.max(32, Math.min(128, (width / targetTilesVisible)))
+    const newTileSize = (calculatedTileSize / 3) * 1.5 // Divide by 3 for zoom, then multiply by 1.5 to make tiles 1.5x bigger
     
-    // Only update if grid size changed significantly
-    if (Math.abs(newExtendedGridSize - this.extendedGridSize) > 5) {
-      this.extendedGridSize = newExtendedGridSize
-      // Recreate pathfinder grid
+    // Only recreate grid if tileSize changed significantly (more than 10%)
+    if (Math.abs(newTileSize - this.tileSize) / this.tileSize > 0.1) {
+      this.tileSize = newTileSize
+      
+      // Update character scale to match new tile size
+      if (this.character) {
+        this.character.updateScale(this.tileSize)
+      }
+      
+      // Recreate grid with new tile size
+      this.tiles.clear()
+      this.removeChildren()
+      this.extendedGridSize = Math.max(
+        this.gridSize, 
+        Math.ceil(this.screenWidth / this.tileSize) + 20,
+        Math.ceil(this.screenHeight / (this.tileSize / 2)) + 20
+      )
       const matrix = Array(this.extendedGridSize).fill(null).map(() => Array(this.extendedGridSize).fill(0))
       this.grid = new PF.Grid(matrix)
+      this.createGrid()
+      this.addChild(this.character)
+    } else {
+      // Just update extended grid size if needed
+      const newExtendedGridSize = Math.max(
+        this.gridSize, 
+        Math.ceil(this.screenWidth / this.tileSize) + 20,
+        Math.ceil(this.screenHeight / (this.tileSize / 2)) + 20
+      )
+      
+      // Only update if grid size changed significantly
+      if (Math.abs(newExtendedGridSize - this.extendedGridSize) > 5) {
+        this.extendedGridSize = newExtendedGridSize
+        // Recreate pathfinder grid
+        const matrix = Array(this.extendedGridSize).fill(null).map(() => Array(this.extendedGridSize).fill(0))
+        this.grid = new PF.Grid(matrix)
+      }
     }
     
     // Recenter character by updating scene position
