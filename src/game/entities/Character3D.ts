@@ -1,4 +1,4 @@
-import { Container, Sprite, Texture, Graphics } from 'pixi.js'
+import { Container, Sprite, Texture } from 'pixi.js'
 import * as THREE from 'three'
 
 /**
@@ -35,13 +35,15 @@ export class Character3D extends Container {
   private leftLeg: THREE.Group | null = null
   private rightLeg: THREE.Group | null = null
   
+  // Base Y offset for character position in Three.js scene
+  private baseYOffset: number = 0
+  
   // For rendering Three.js to PixiJS
   private threeCanvas: HTMLCanvasElement
   private threeTexture: Texture
   private threeSprite: Sprite
-  private baseTileSize: number = 64 // Base tile size for scaling calculations
 
-  constructor(tileSize: number = 64) {
+  constructor() {
     super()
     
     // Initialize Three.js components
@@ -80,6 +82,8 @@ export class Character3D extends Container {
     
     // Create 3D character
     this.character = this.create3DCharacter()
+    // Store the base Y offset from the group position
+    this.baseYOffset = this.character.position.y
     // Scale character down by 1.5
     this.character.scale.set(1 / 1.5, 1 / 1.5, 1 / 1.5)
     this.scene.add(this.character)
@@ -99,33 +103,8 @@ export class Character3D extends Container {
     
     // Create sprite from texture
     this.threeSprite = new Sprite(this.threeTexture)
-    // Keep anchor at center (0.5, 0.5)
     this.threeSprite.anchor.set(0.5, 0.5)
-    
-    // Scale sprite proportionally to tile size
-    // Character should be 4 times bigger relative to tile size, but divided by 1.5 to compensate for tiles being 1.5x bigger
-    // This keeps character the same absolute size while tiles are 1.5x bigger
-    const characterSizeRatio = 0.65 // Base character size relative to tile
-    const scaleMultiplier = 4 / 1.5 // Make character 4 times bigger, but divide by 1.5 to compensate for 1.5x bigger tiles
-    const scale = (tileSize / this.baseTileSize) * characterSizeRatio * scaleMultiplier
-    this.threeSprite.scale.set(scale, scale)
-    
-    // Offset sprite upward by half tile height so origin (0, 0) appears at character's feet
-    // For isometric tiles, the height is tileSize / 2, so half height is tileSize / 4
-    const halfTileHeight = tileSize / 4
-    this.threeSprite.y = -halfTileHeight // Move up by half tile height
-    
     this.addChild(this.threeSprite)
-    
-    // Add a small red cross at character origin (0, 0) for debugging
-    const originCross = new Graphics()
-    const crossSize = 5
-    originCross.moveTo(-crossSize, 0)
-    originCross.lineTo(crossSize, 0)
-    originCross.moveTo(0, -crossSize)
-    originCross.lineTo(0, crossSize)
-    originCross.stroke({ width: 2, color: 0xff0000 }) // Red
-    // this.addChild(originCross)
   }
 
   /**
@@ -212,6 +191,8 @@ export class Character3D extends Container {
     const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial)
     rightEye.position.set(0.15, 1.5, 0.45)
     group.add(rightEye)
+
+    group.position.set(0, 0.5, 0)
     
     return group
   }
@@ -254,7 +235,8 @@ export class Character3D extends Container {
     // Animate character when moving (simple bounce)
     const time = this.clock.getElapsedTime()
     if (this.isMoving) {
-      this.character.position.y = Math.sin(time * 5) * 0.1
+      // Add bounce animation to base Y offset
+      this.character.position.y = this.baseYOffset + Math.sin(time * 5) * 0.1
       
       // Animate legs for walking motion
       if (this.leftLeg && this.rightLeg) {
@@ -268,7 +250,8 @@ export class Character3D extends Container {
         this.rightLeg.rotation.x = Math.sin(time * walkSpeed + Math.PI) * legSwingAngle
       }
     } else {
-      this.character.position.y = 0
+      // Use base Y offset when not moving
+      this.character.position.y = this.baseYOffset
       
       // Reset legs to neutral position when not moving
       if (this.leftLeg && this.rightLeg) {
@@ -472,6 +455,18 @@ export class Character3D extends Container {
   }
 
   /**
+   * Update character scale based on tile size
+   * Scales the character proportionally to match the tile size
+   */
+  updateScale(tileSize: number) {
+    // Base scale factor (1/1.5 from constructor) adjusted by tile size
+    // Use a reference tile size (64) to maintain proportions
+    const baseTileSize = 64
+    const scaleFactor = (1.4) * (tileSize / baseTileSize)
+    this.character.scale.set(scaleFactor, scaleFactor, scaleFactor)
+  }
+
+  /**
    * Load a GLTF model for the character (optional)
    * Call this when you have a 3D model file
    */
@@ -503,21 +498,6 @@ export class Character3D extends Container {
       this.character.scale.set(1, 1, 1)
     } catch (error) {
       console.warn('Failed to load GLTF model:', error)
-    }
-  }
-
-  /**
-   * Update character sprite scale based on new tile size
-   * This ensures the character maintains the same proportion relative to tiles
-   */
-  updateScale(tileSize: number) {
-    // Character should be 4 times bigger relative to tile size, but divided by 1.5 to compensate for tiles being 1.5x bigger
-    // This keeps character the same absolute size while tiles are 1.5x bigger
-    const characterSizeRatio = 0.65 // Base character size relative to tile
-    const scaleMultiplier = 4 / 1.5 // Make character 4 times bigger, but divide by 1.5 to compensate for 1.5x bigger tiles
-    const scale = (tileSize / this.baseTileSize) * characterSizeRatio * scaleMultiplier
-    if (this.threeSprite) {
-      this.threeSprite.scale.set(scale, scale)
     }
   }
 

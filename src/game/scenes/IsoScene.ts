@@ -27,14 +27,16 @@ export class IsoScene extends Container {
     // Calculate tileSize based on screen dimensions to maintain consistent proportions
     // Use a base tile size that scales with screen width (aim for ~10-15 tiles visible)
     // Divide by 3 to zoom out, then multiply by 1.5 to make tiles 1.5x bigger
+    // Then divide by 2 to subdivide each tile into 4 (2x2 grid)
     const targetTilesVisible = 12
     const calculatedTileSize = Math.max(32, Math.min(128, (screenWidth / targetTilesVisible)))
-    this.tileSize = (calculatedTileSize / 3) * 1.5 // Divide by 3 for zoom, then multiply by 1.5 to make tiles 1.5x bigger
+    this.tileSize = ((calculatedTileSize / 3) * 1.5) / 2 // Divide by 2 to subdivide tiles into 4
     
     // Calculate extended grid size to cover the entire screen when panned
     // For isometric, we need more tiles to cover the diagonal view
+    // Multiply by 2 to double the grid resolution (each original tile becomes 4 tiles)
     this.extendedGridSize = Math.max(
-      this.gridSize, 
+      this.gridSize * 2, 
       Math.ceil(this.screenWidth / this.tileSize) + 20,
       Math.ceil(this.screenHeight / (this.tileSize / 2)) + 20
     )
@@ -150,7 +152,9 @@ export class IsoScene extends Container {
   }
 
   private createCharacter() {
-    this.character = new Character3D(this.tileSize)
+    this.character = new Character3D()
+    // Set initial scale based on tile size
+    this.character.updateScale(this.tileSize)
     // Start at center of extended grid (in isometric grid coordinates)
     // Round to nearest integer to ensure character is exactly at a tile center
     const centerIsoX = Math.round(this.extendedGridSize / 2)
@@ -314,9 +318,10 @@ export class IsoScene extends Container {
     
     // Recalculate tileSize based on new screen dimensions
     // Divide by 3 to zoom out, then multiply by 1.5 to make tiles 1.5x bigger
+    // Then divide by 2 to subdivide each tile into 4 (2x2 grid)
     const targetTilesVisible = 12
     const calculatedTileSize = Math.max(32, Math.min(128, (width / targetTilesVisible)))
-    const newTileSize = (calculatedTileSize / 3) * 1.5 // Divide by 3 for zoom, then multiply by 1.5 to make tiles 1.5x bigger
+    const newTileSize = ((calculatedTileSize / 3) * 1.5) / 2 // Divide by 2 to subdivide tiles into 4
     
     // Only recreate grid if tileSize changed significantly (more than 10%)
     if (Math.abs(newTileSize - this.tileSize) / this.tileSize > 0.1) {
@@ -328,10 +333,11 @@ export class IsoScene extends Container {
       }
       
       // Recreate grid with new tile size
+      // Multiply by 2 to double the grid resolution (each original tile becomes 4 tiles)
       this.tiles.clear()
       this.removeChildren()
       this.extendedGridSize = Math.max(
-        this.gridSize, 
+        this.gridSize * 2, 
         Math.ceil(this.screenWidth / this.tileSize) + 20,
         Math.ceil(this.screenHeight / (this.tileSize / 2)) + 20
       )
@@ -341,8 +347,9 @@ export class IsoScene extends Container {
       this.addChild(this.character)
     } else {
       // Just update extended grid size if needed
+      // Multiply by 2 to double the grid resolution (each original tile becomes 4 tiles)
       const newExtendedGridSize = Math.max(
-        this.gridSize, 
+        this.gridSize * 2, 
         Math.ceil(this.screenWidth / this.tileSize) + 20,
         Math.ceil(this.screenHeight / (this.tileSize / 2)) + 20
       )
