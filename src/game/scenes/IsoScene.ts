@@ -17,6 +17,7 @@ export class IsoScene extends Container {
   private tiles: Map<string, Graphics> = new Map() // Store tiles by grid coordinates "isoX,isoY"
   private selectedTile: Graphics | null = null // Currently selected target tile
   private selectedTileKey: string | null = null // Key of currently selected tile
+  private obstacles: Set<string> = new Set() // Store obstacle positions as "isoX,isoY"
 
   constructor(screenWidth: number, screenHeight: number) {
     super()
@@ -43,7 +44,25 @@ export class IsoScene extends Container {
     
     // Initialize pathfinder with extended grid size
     this.pathfinder = new PF.AStarFinder()
+    
+    // Create obstacles first, then build grid with obstacles
+    this.createRandomObstacles()
+    
+    // Build pathfinding grid with obstacles marked as blocked
     const matrix = Array(this.extendedGridSize).fill(null).map(() => Array(this.extendedGridSize).fill(0))
+    for (const obstacleKey of this.obstacles) {
+      const parts = obstacleKey.split(',')
+      if (parts.length >= 2 && parts[0] !== undefined && parts[1] !== undefined) {
+        const isoX = Number(parts[0])
+        const isoY = Number(parts[1])
+        if (!isNaN(isoX) && !isNaN(isoY) && isoX >= 0 && isoX < this.extendedGridSize && isoY >= 0 && isoY < this.extendedGridSize) {
+          const row = matrix[isoY]
+          if (row) {
+            row[isoX] = 1 // Mark as blocked (note: matrix uses [row][col] = [y][x])
+          }
+        }
+      }
+    }
     this.grid = new PF.Grid(matrix)
 
     this.createGrid()
@@ -58,6 +77,8 @@ export class IsoScene extends Container {
     // Grey tiles with light grey strokes
     const tileColor = 0x808080 // Grey
     const borderColor = 0xb0b0b0 // Light grey
+    const obstacleColor = 0x404040 // Dark grey for obstacles
+    const obstacleBorderColor = 0x505050 // Darker grey border for obstacles
     
     for (let isoX = 0; isoX < this.extendedGridSize; isoX++) {
       for (let isoY = 0; isoY < this.extendedGridSize; isoY++) {
@@ -83,15 +104,68 @@ export class IsoScene extends Container {
           screenPos.x, screenPos.y + scaledHalfHeight,           // Bottom
           screenPos.x - scaledHalfWidth, screenPos.y             // Left
         ])
-        tile.fill(tileColor)
-        tile.stroke({ width: 1, color: borderColor })
+        
+        // Check if this tile is an obstacle
+        const tileKey = `${isoX},${isoY}`
+        const isObstacle = this.obstacles.has(tileKey)
+        
+        // Use dark grey for obstacles, normal grey for walkable tiles
+        tile.fill(isObstacle ? obstacleColor : tileColor)
+        tile.stroke({ width: 1, color: isObstacle ? obstacleBorderColor : borderColor })
         
         // Store tile reference by grid coordinates
-        const tileKey = `${isoX},${isoY}`
         this.tiles.set(tileKey, tile)
         
         this.addChild(tile)
       }
+    }
+  }
+
+  /**
+   * Create random obstacles in the scene
+   * Obstacles are placed randomly but avoid the character's starting position
+   */
+  private createRandomObstacles() {
+    this.obstacles.clear()
+    
+    // Calculate obstacle density (about 15% of tiles will be obstacles)
+    const totalTiles = this.extendedGridSize * this.extendedGridSize
+    const obstacleCount = Math.floor(totalTiles * 0.15)
+    
+    // Get character starting position to avoid placing obstacles there
+    const centerIsoX = Math.round(this.extendedGridSize / 2)
+    const centerIsoY = Math.round(this.extendedGridSize / 2)
+    
+    // Also avoid a small area around the character (3x3 tiles)
+    const avoidRadius = 1
+    
+    // Generate random obstacles
+    let placed = 0
+    const maxAttempts = obstacleCount * 10 // Prevent infinite loop
+    let attempts = 0
+    
+    while (placed < obstacleCount && attempts < maxAttempts) {
+      attempts++
+      
+      const isoX = Math.floor(Math.random() * this.extendedGridSize)
+      const isoY = Math.floor(Math.random() * this.extendedGridSize)
+      const tileKey = `${isoX},${isoY}`
+      
+      // Skip if already an obstacle
+      if (this.obstacles.has(tileKey)) {
+        continue
+      }
+      
+      // Skip if too close to character starting position
+      const distanceX = Math.abs(isoX - centerIsoX)
+      const distanceY = Math.abs(isoY - centerIsoY)
+      if (distanceX <= avoidRadius && distanceY <= avoidRadius) {
+        continue
+      }
+      
+      // Add obstacle
+      this.obstacles.add(tileKey)
+      placed++
     }
   }
   
@@ -249,8 +323,24 @@ export class IsoScene extends Container {
     const startGridX = Math.max(0, Math.min(this.extendedGridSize - 1, Math.floor(currentIso.x)))
     const startGridY = Math.max(0, Math.min(this.extendedGridSize - 1, Math.floor(currentIso.y)))
     
-    // Rebuild grid (no obstacles for now, but keeping structure for future)
+    // Rebuild grid with obstacles marked as blocked (1 = blocked, 0 = walkable)
     const matrix = Array(this.extendedGridSize).fill(null).map(() => Array(this.extendedGridSize).fill(0))
+    
+    // Mark obstacles as blocked in the pathfinding grid
+    for (const obstacleKey of this.obstacles) {
+      const parts = obstacleKey.split(',')
+      if (parts.length >= 2 && parts[0] !== undefined && parts[1] !== undefined) {
+        const isoX = Number(parts[0])
+        const isoY = Number(parts[1])
+        if (!isNaN(isoX) && !isNaN(isoY) && isoX >= 0 && isoX < this.extendedGridSize && isoY >= 0 && isoY < this.extendedGridSize) {
+          const row = matrix[isoY]
+          if (row) {
+            row[isoX] = 1 // Mark as blocked (note: matrix uses [row][col] = [y][x])
+          }
+        }
+      }
+    }
+    
     this.grid = new PF.Grid(matrix)
     
     // Calculate path
@@ -343,6 +433,7 @@ export class IsoScene extends Container {
       )
       const matrix = Array(this.extendedGridSize).fill(null).map(() => Array(this.extendedGridSize).fill(0))
       this.grid = new PF.Grid(matrix)
+      this.createRandomObstacles() // Recreate obstacles for new grid size
       this.createGrid()
       this.addChild(this.character)
     } else {
@@ -357,8 +448,23 @@ export class IsoScene extends Container {
       // Only update if grid size changed significantly
       if (Math.abs(newExtendedGridSize - this.extendedGridSize) > 5) {
         this.extendedGridSize = newExtendedGridSize
-        // Recreate pathfinder grid
+        // Recreate obstacles for new grid size
+        this.createRandomObstacles()
+        // Recreate pathfinder grid with obstacles
         const matrix = Array(this.extendedGridSize).fill(null).map(() => Array(this.extendedGridSize).fill(0))
+        for (const obstacleKey of this.obstacles) {
+          const parts = obstacleKey.split(',')
+          if (parts.length >= 2 && parts[0] !== undefined && parts[1] !== undefined) {
+            const isoX = Number(parts[0])
+            const isoY = Number(parts[1])
+            if (!isNaN(isoX) && !isNaN(isoY) && isoX >= 0 && isoX < this.extendedGridSize && isoY >= 0 && isoY < this.extendedGridSize) {
+              const row = matrix[isoY]
+              if (row) {
+                row[isoX] = 1
+              }
+            }
+          }
+        }
         this.grid = new PF.Grid(matrix)
       }
     }
