@@ -17,6 +17,7 @@ export class Character3D extends Container {
   private moveSpeed: number = 6000 // Constant movement speed (pixels per second)
   private path: Array<{ x: number; y: number }> = [] // Path waypoints to follow
   private currentPathIndex: number = 0 // Current waypoint index in path
+  private finalTargetPosition: { x: number; y: number } | null = null // Final target to face when arriving
   
   // Rotation state for smooth rotation
   private currentRotationY: number = 0 // Current rotation angle in radians
@@ -314,25 +315,26 @@ export class Character3D extends Container {
   /**
    * Snap rotation to one of the 4 main isometric directions
    * Called when character arrives at destination
+   * Uses targetRotationY to find the nearest main direction (towards the target)
    */
   private snapToMainDirection(): void {
     // The 4 main isometric directions: 0°, 90°, 180°, 270°
     const mainDirections: number[] = [0, Math.PI / 2, Math.PI, 3 * Math.PI / 2]
     
-    // Find the nearest main direction
+    // Find the nearest main direction based on targetRotationY (direction towards target)
     let nearestDirection: number = mainDirections[0]!
-    let smallestDiff = Math.abs(this.currentRotationY - mainDirections[0]!)
+    let smallestDiff = Math.abs(this.targetRotationY - mainDirections[0]!)
     
-    // Normalize current rotation for comparison
-    let normalizedCurrent = this.currentRotationY
-    while (normalizedCurrent < 0) normalizedCurrent += Math.PI * 2
-    while (normalizedCurrent >= Math.PI * 2) normalizedCurrent -= Math.PI * 2
+    // Normalize target rotation for comparison
+    let normalizedTarget = this.targetRotationY
+    while (normalizedTarget < 0) normalizedTarget += Math.PI * 2
+    while (normalizedTarget >= Math.PI * 2) normalizedTarget -= Math.PI * 2
     
     for (const direction of mainDirections) {
       // Calculate difference considering wrap-around
-      const diff1 = Math.abs(normalizedCurrent - direction)
-      const diff2 = Math.abs(normalizedCurrent - (direction + Math.PI * 2))
-      const diff3 = Math.abs(normalizedCurrent - (direction - Math.PI * 2))
+      const diff1 = Math.abs(normalizedTarget - direction)
+      const diff2 = Math.abs(normalizedTarget - (direction + Math.PI * 2))
+      const diff3 = Math.abs(normalizedTarget - (direction - Math.PI * 2))
       const diff = Math.min(diff1, diff2, diff3)
       
       if (diff < smallestDiff) {
@@ -368,10 +370,27 @@ export class Character3D extends Container {
    * Move the character along a path (array of waypoints)
    * This is used for pathfinding to navigate around obstacles
    * @param path Array of waypoints in screen coordinates, or grid coordinates with tileSize
-   * @param tileSize Optional: if provided, path is treated as grid coordinates
+   * @param tileSizeOrTarget Optional: if number, path is treated as grid coordinates. If object with x/y, it's the final target to face.
+   * @param finalTarget Optional: if tileSizeOrTarget is a number, this can be the final target position to face
    */
-  moveAlongPath(path: Array<[number, number]> | Array<{ x: number; y: number }>, tileSize?: number) {
+  moveAlongPath(
+    path: Array<[number, number]> | Array<{ x: number; y: number }>, 
+    tileSizeOrTarget?: number | { x: number; y: number },
+    finalTarget?: { x: number; y: number }
+  ) {
     if (path.length === 0) return
+    
+    // Determine if tileSizeOrTarget is a number (tileSize) or object (finalTarget)
+    let tileSize: number | undefined
+    if (typeof tileSizeOrTarget === 'number') {
+      tileSize = tileSizeOrTarget
+      this.finalTargetPosition = finalTarget || null
+    } else if (tileSizeOrTarget && typeof tileSizeOrTarget === 'object') {
+      this.finalTargetPosition = tileSizeOrTarget
+    } else {
+      // tileSizeOrTarget is undefined, check if finalTarget is provided
+      this.finalTargetPosition = finalTarget || null
+    }
     
     // Convert path to screen coordinates
     if (tileSize !== undefined && path.length > 0 && Array.isArray(path[0]) && path[0].length === 2) {
@@ -393,8 +412,11 @@ export class Character3D extends Container {
     
     // Start moving to first waypoint
     if (this.path.length > 0) {
-      this.targetX = this.path[0]?.x ?? 0
-      this.targetY = this.path[0]?.y ?? 0
+      const firstPoint = this.path[0]
+      if (firstPoint) {
+        this.targetX = firstPoint.x
+        this.targetY = firstPoint.y
+      }
     }
   }
 
@@ -432,12 +454,26 @@ export class Character3D extends Container {
         return true // Continue moving to next waypoint
       } else {
         // Reached end of path or no path
-        // Snap rotation to one of the 4 main directions when arriving at destination
-        this.snapToMainDirection()
+        // If there's a final target position, orient character towards it
+        if (this.finalTargetPosition) {
+          const dx = this.finalTargetPosition.x - this.currentX
+          const dy = this.finalTargetPosition.y - this.currentY
+          if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1) {
+            this.targetRotationY = this.calculateIsoRotation(dx, dy)
+            // Snap to main direction after calculating rotation towards target
+            this.snapToMainDirection()
+          } else {
+            this.snapToMainDirection()
+          }
+        } else {
+          // Snap rotation to one of the 4 main directions when arriving at destination
+          this.snapToMainDirection()
+        }
         
         this.isMoving = false
         this.path = []
         this.currentPathIndex = 0
+        this.finalTargetPosition = null
         return false
       }
     }

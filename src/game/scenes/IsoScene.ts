@@ -18,6 +18,7 @@ export class IsoScene extends Container {
   private selectedTile: Graphics | null = null // Currently selected target tile
   private selectedTileKey: string | null = null // Key of currently selected tile
   private obstacles: Set<string> = new Set() // Store obstacle positions as "isoX,isoY"
+  private adjacentTiles: Graphics[] = [] // Store currently highlighted adjacent tiles
 
   constructor(screenWidth: number, screenHeight: number) {
     super()
@@ -174,34 +175,67 @@ export class IsoScene extends Container {
   }
   
   /**
-   * Highlight a target tile in yellow
+   * Reset a tile to its default color (grey or dark grey for obstacles)
+   */
+  private resetTileColor(gridX: number, gridY: number) {
+    const tileKey = `${gridX},${gridY}`
+    const tile = this.tiles.get(tileKey)
+    if (!tile) return
+    
+    const isObstacle = this.obstacles.has(tileKey)
+    const tileColor = isObstacle ? 0x404040 : 0x808080 // Dark grey for obstacles, grey for walkable
+    const borderColor = isObstacle ? 0x505050 : 0xb0b0b0
+    
+    tile.clear()
+    const screenPos = IsoUtils.isoToScreen(gridX, gridY, this.tileSize)
+    const halfWidth = this.tileSize / 2
+    const halfHeight = this.tileSize / 4
+    const scale = 2.0
+    const scaledHalfWidth = halfWidth * scale
+    const scaledHalfHeight = halfHeight * scale
+    
+    tile.poly([
+      screenPos.x, screenPos.y - scaledHalfHeight,
+      screenPos.x + scaledHalfWidth, screenPos.y,
+      screenPos.x, screenPos.y + scaledHalfHeight,
+      screenPos.x - scaledHalfWidth, screenPos.y
+    ])
+    tile.fill(tileColor)
+    tile.stroke({ width: 1, color: borderColor })
+  }
+
+  /**
+   * Highlight a target tile in yellow and adjacent tiles in green
    */
   private highlightTargetTile(gridX: number, gridY: number) {
     const tileKey = `${gridX},${gridY}`
     
-    // Reset previous selected tile to grey
+    // Reset previous selected tile and adjacent tiles
     if (this.selectedTile && this.selectedTileKey) {
-      this.selectedTile.clear()
-      const prevScreenPos = IsoUtils.isoToScreen(
+      this.resetTileColor(
         parseInt(this.selectedTileKey.split(',')[0] || '0'),
-        parseInt(this.selectedTileKey.split(',')[1] || '0'),
-        this.tileSize
+        parseInt(this.selectedTileKey.split(',')[1] || '0')
       )
-      const halfWidth = this.tileSize / 2
-      const halfHeight = this.tileSize / 4
-      const scale = 2.0
-      const scaledHalfWidth = halfWidth * scale
-      const scaledHalfHeight = halfHeight * scale
-      
-      this.selectedTile.poly([
-        prevScreenPos.x, prevScreenPos.y - scaledHalfHeight,
-        prevScreenPos.x + scaledHalfWidth, prevScreenPos.y,
-        prevScreenPos.x, prevScreenPos.y + scaledHalfHeight,
-        prevScreenPos.x - scaledHalfWidth, prevScreenPos.y
-      ])
-      this.selectedTile.fill(0x808080) // Grey
-      this.selectedTile.stroke({ width: 1, color: 0xb0b0b0 }) // Light grey
     }
+    
+    // Reset previous adjacent tiles
+    for (const adjacentTile of this.adjacentTiles) {
+      // Find the tile key for this adjacent tile
+      for (const [key, tile] of this.tiles.entries()) {
+        if (tile === adjacentTile) {
+          const parts = key.split(',')
+          if (parts.length >= 2 && parts[0] !== undefined && parts[1] !== undefined) {
+            const adjX = parseInt(parts[0])
+            const adjY = parseInt(parts[1])
+            if (!isNaN(adjX) && !isNaN(adjY)) {
+              this.resetTileColor(adjX, adjY)
+            }
+          }
+          break
+        }
+      }
+    }
+    this.adjacentTiles = []
     
     // Get the new target tile
     const targetTile = this.tiles.get(tileKey)
@@ -226,6 +260,50 @@ export class IsoScene extends Container {
       
       this.selectedTile = targetTile
       this.selectedTileKey = tileKey
+    }
+    
+    // Highlight adjacent tiles in green (if not obstacles)
+    const adjacentPositions = [
+      { x: gridX + 1, y: gridY }, // East
+      { x: gridX - 1, y: gridY }, // West
+      { x: gridX, y: gridY + 1 }, // South
+      { x: gridX, y: gridY - 1 }  // North
+    ]
+    
+    for (const pos of adjacentPositions) {
+      // Check bounds
+      if (pos.x < 0 || pos.x >= this.extendedGridSize || pos.y < 0 || pos.y >= this.extendedGridSize) {
+        continue
+      }
+      
+      const adjTileKey = `${pos.x},${pos.y}`
+      
+      // Skip if it's an obstacle
+      if (this.obstacles.has(adjTileKey)) {
+        continue
+      }
+      
+      const adjTile = this.tiles.get(adjTileKey)
+      if (adjTile) {
+        adjTile.clear()
+        const adjScreenPos = IsoUtils.isoToScreen(pos.x, pos.y, this.tileSize)
+        const halfWidth = this.tileSize / 2
+        const halfHeight = this.tileSize / 4
+        const scale = 2.0
+        const scaledHalfWidth = halfWidth * scale
+        const scaledHalfHeight = halfHeight * scale
+        
+        adjTile.poly([
+          adjScreenPos.x, adjScreenPos.y - scaledHalfHeight,
+          adjScreenPos.x + scaledHalfWidth, adjScreenPos.y,
+          adjScreenPos.x, adjScreenPos.y + scaledHalfHeight,
+          adjScreenPos.x - scaledHalfWidth, adjScreenPos.y
+        ])
+        adjTile.fill(0x00ff00) // Green
+        adjTile.stroke({ width: 1, color: 0x00cc00 }) // Darker green border
+        
+        this.adjacentTiles.push(adjTile)
+      }
     }
   }
 
@@ -353,14 +431,33 @@ export class IsoScene extends Container {
     
     this.grid = new PF.Grid(matrix)
     
-    // Calculate path
-    const path = this.pathfinder.findPath(startGridX, startGridY, clampedGridX, clampedGridY, this.grid)
+    // Find the closest adjacent tile (green tile) to the character's starting position
+    // The 4 adjacent positions around the target tile
+    const adjacentPositions = [
+      { x: clampedGridX + 1, y: clampedGridY }, // East
+      { x: clampedGridX - 1, y: clampedGridY }, // West
+      { x: clampedGridX, y: clampedGridY + 1 }, // South
+      { x: clampedGridX, y: clampedGridY - 1 }  // North
+    ]
     
-    if (path.length > 0) {
-      // Skip the first point if it's the current position
-      const pathToFollow = path.length > 1 ? path.slice(1) : path
+    // Filter valid adjacent tiles (within bounds and not obstacles)
+    const validAdjacentTiles = adjacentPositions.filter(pos => {
+      if (pos.x < 0 || pos.x >= this.extendedGridSize || pos.y < 0 || pos.y >= this.extendedGridSize) {
+        return false
+      }
+      const tileKey = `${pos.x},${pos.y}`
+      return !this.obstacles.has(tileKey)
+    })
+    
+    // If no valid adjacent tiles, use target tile itself
+    if (validAdjacentTiles.length === 0) {
+      // Fallback to target tile if no adjacent tiles are available
+      const path = this.pathfinder.findPath(startGridX, startGridY, clampedGridX, clampedGridY, this.grid)
+      if (path.length === 0) {
+        return // No path found
+      }
       
-      // Convert isometric grid coordinates to screen coordinates for the path
+      const pathToFollow = path.length > 1 ? path.slice(1) : path
       const screenPath = pathToFollow
         .map((point) => {
           if (point && point.length >= 2 && point[0] !== undefined && point[1] !== undefined) {
@@ -373,11 +470,79 @@ export class IsoScene extends Container {
         })
         .filter((point): point is { x: number; y: number } => point !== null)
       
-      // Move character along the path (using screen coordinates)
-      if (screenPath.length > 0) {
-        this.character.moveAlongPath(screenPath)
+      if (screenPath.length === 0) {
+        const targetScreenPos = IsoUtils.isoToScreen(clampedGridX, clampedGridY, this.tileSize)
+        this.character.moveTo(targetScreenPos.x, targetScreenPos.y)
+        return
+      }
+      
+      const targetScreenPos = IsoUtils.isoToScreen(clampedGridX, clampedGridY, this.tileSize)
+      this.character.moveAlongPath(screenPath, undefined, targetScreenPos)
+      return
+    }
+    
+    // Calculate distance from start position to each valid adjacent tile
+    // Find the closest one
+    let closestTile = validAdjacentTiles[0]!
+    let minDistance = Infinity
+    
+    for (const tile of validAdjacentTiles) {
+      // Calculate Manhattan distance (or Euclidean, both work for grid)
+      const dx = tile.x - startGridX
+      const dy = tile.y - startGridY
+      const distance = Math.sqrt(dx * dx + dy * dy)
+      
+      if (distance < minDistance) {
+        minDistance = distance
+        closestTile = tile
       }
     }
+    
+    // Calculate path to the closest adjacent tile
+    const stopTileX = closestTile.x
+    const stopTileY = closestTile.y
+    const finalPath = this.pathfinder.findPath(startGridX, startGridY, stopTileX, stopTileY, this.grid)
+    
+    // Ensure we have a valid path
+    if (finalPath.length === 0) {
+      return // No valid path found
+    }
+    
+    // Skip the first point if it's the current position
+    const pathToFollow = finalPath.length > 1 ? finalPath.slice(1) : finalPath
+    
+    // Debug: ensure pathToFollow is not empty
+    if (pathToFollow.length === 0) {
+      // If path only has one point (current position), use the target directly
+      const targetScreenPos = IsoUtils.isoToScreen(clampedGridX, clampedGridY, this.tileSize)
+      this.character.moveTo(targetScreenPos.x, targetScreenPos.y)
+      return
+    }
+    
+    // Convert isometric grid coordinates to screen coordinates for the path
+    const screenPath = pathToFollow
+      .map((point) => {
+        if (point && point.length >= 2 && point[0] !== undefined && point[1] !== undefined) {
+          const isoX = point[0]
+          const isoY = point[1]
+          const screenPos = IsoUtils.isoToScreen(isoX, isoY, this.tileSize)
+          return { x: screenPos.x, y: screenPos.y }
+        }
+        return null
+      })
+      .filter((point): point is { x: number; y: number } => point !== null)
+    
+    // Ensure screen path is not empty
+    if (screenPath.length === 0) {
+      return // No valid screen path
+    }
+    
+    // Calculate target tile position for final orientation
+    const targetScreenPos = IsoUtils.isoToScreen(clampedGridX, clampedGridY, this.tileSize)
+    
+    // Move character along the path (using screen coordinates)
+    // Pass target position for final orientation
+    this.character.moveAlongPath(screenPath, undefined, targetScreenPos)
   }
 
   /**
