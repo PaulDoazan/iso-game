@@ -295,11 +295,32 @@ export class Character3D extends Container {
     // Calculate actual angle using atan2 for smooth continuous rotation
     let angle = Math.atan2(dy, dx)
     
-    // In isometric view, the coordinate system is rotated
-    // Based on isoToScreen: x = (isoX - isoY) * tileSize, y = (isoX + isoY) * tileSize / 2
-    // The screen coordinates are rotated 45 degrees from standard Cartesian
-    // Adjust the angle to align with isometric axes
-    angle += Math.PI / 4
+    // Determine which quadrant/direction we're moving in
+    // In isometric: 
+    // - Bottom-left (dx < 0, dy > 0): correct - keep as is
+    // - Top-right (dx > 0, dy < 0): correct - keep as is
+    // - Top-left (dx < 0, dy < 0): needs clockwise rotation
+    // - Bottom-right (dx > 0, dy > 0): needs clockwise rotation
+    
+    const isTopLeft = dx < 0 && dy < 0
+    const isBottomRight = dx > 0 && dy > 0
+    const isTopRight = dx > 0 && dy < 0
+    const isBottomLeft = dx < 0 && dy > 0
+    
+    const isometricAngle = Math.atan(0.5) // ≈ 26.565° for 2:1 isometric
+    
+    // Apply different offset based on direction
+    if (isTopLeft || isBottomRight) {
+      // These directions need more clockwise rotation
+      // Increase the angle to rotate more clockwise (add more offset)
+      angle += isometricAngle + Math.PI / 6 + Math.PI / 36 // Add 30° + 5° = 35° correction for more clockwise rotation
+    } else if (isTopRight || isBottomLeft) {
+      // These directions are correct - keep current calculation
+      angle += isometricAngle
+    } else {
+      // Edge cases - use default
+      angle += isometricAngle
+    }
     
     // Add 180 degrees (π) so character faces the direction it's looking at
     // Negate the angle to reverse rotation direction (clockwise movement = clockwise rotation)
@@ -439,7 +460,29 @@ export class Character3D extends Container {
 
     // Calculate target rotation based on movement direction
     if (distance > 0.1) {
-      this.targetRotationY = this.calculateIsoRotation(dx, dy)
+      // If we have a final target position and the movement is not diagonal (pure horizontal or vertical),
+      // orient towards the final target instead of the next waypoint
+      if (this.finalTargetPosition) {
+        const absDx = Math.abs(dx)
+        const absDy = Math.abs(dy)
+        const isDiagonal = absDx > 0.1 && absDy > 0.1
+        
+        // For non-diagonal movement (corridors), orient towards final target
+        if (!isDiagonal) {
+          const finalDx = this.finalTargetPosition.x - this.currentX
+          const finalDy = this.finalTargetPosition.y - this.currentY
+          const finalDistance = Math.sqrt(finalDx * finalDx + finalDy * finalDy)
+          if (finalDistance > 0.1) {
+            this.targetRotationY = this.calculateIsoRotation(finalDx, finalDy)
+          }
+        } else {
+          // For diagonal movement, use movement direction
+          this.targetRotationY = this.calculateIsoRotation(dx, dy)
+        }
+      } else {
+        // No final target, use movement direction
+        this.targetRotationY = this.calculateIsoRotation(dx, dy)
+      }
     }
 
     if (distance < 0.1) {
