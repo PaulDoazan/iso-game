@@ -235,8 +235,6 @@ export class Character3D extends Container {
     // Animate character when moving (simple bounce)
     const time = this.clock.getElapsedTime()
     if (this.isMoving) {
-      // Add bounce animation to base Y offset
-      this.character.position.y = this.baseYOffset + Math.sin(time * 5) * 0.1
       
       // Animate legs for walking motion
       if (this.leftLeg && this.rightLeg) {
