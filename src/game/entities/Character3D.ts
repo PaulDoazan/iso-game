@@ -281,41 +281,60 @@ export class Character3D extends Container {
 
   /**
    * Calculate rotation angle from screen-space movement direction
-   * Isometric 4 directions: topRight (0°), topLeft (90°), downLeft (180°), downRight (270°)
+   * Supports 8 directions (including diagonals) but snaps to 4 main isometric directions
+   * Isometric 4 main directions: topRight (0°), topLeft (90°), downLeft (180°), downRight (270°)
+   * Diagonal movements snap to the dominant axis direction
    */
   private calculateIsoRotation(dx: number, dy: number): number {
     // Normalize movement direction
     const length = Math.sqrt(dx * dx + dy * dy)
     if (length < 0.1) return this.targetRotationY
     
-    // In isometric view, the 4 directions are:
-    // topRight: dx > 0, dy < 0 (moving right and up)
-    // topLeft: dx < 0, dy < 0 (moving left and up)
-    // downLeft: dx < 0, dy > 0 (moving left and down)
-    // downRight: dx > 0, dy > 0 (moving right and down)
+    const absDx = Math.abs(dx)
+    const absDy = Math.abs(dy)
     
-    // Determine which isometric direction based on dx and dy signs
-    // Add 180 degrees (π) to reverse direction so character faces forward
-    if (dx > 0 && dy < 0) {
-      // topRight: 0 + 180 = 180 degrees
-      return Math.PI
-    } else if (dx < 0 && dy < 0) {
-      // topLeft: 90 + 180 = 270 degrees
-      return 3 * Math.PI / 2
-    } else if (dx < 0 && dy > 0) {
-      // downLeft: 180 + 180 = 360 degrees (0)
-      return 0
-    } else if (dx > 0 && dy > 0) {
-      // downRight: 270 + 180 = 450 degrees (90)
-      return Math.PI / 2
-    } else {
-      // Edge cases: use dominant axis, add 180 degrees
-      const absDx = Math.abs(dx)
-      const absDy = Math.abs(dy)
+    // For diagonal movement, determine the dominant axis
+    // This allows 8-directional movement but character faces the 4 main directions
+    const isDiagonal = absDx > 0.1 && absDy > 0.1
+    
+    if (isDiagonal) {
+      // Diagonal movement: snap to the dominant axis direction
       if (absDx > absDy) {
-        return dx > 0 ? Math.PI : 0
+        // Horizontal movement is dominant
+        return dx > 0 ? Math.PI : 0 // Right or Left
       } else {
-        return dy > 0 ? (Math.PI / 2) : (3 * Math.PI / 2)
+        // Vertical movement is dominant
+        return dy > 0 ? (Math.PI / 2) : (3 * Math.PI / 2) // Down or Up
+      }
+    } else {
+      // Pure horizontal or vertical movement (4 main directions)
+      // In isometric view, the 4 directions are:
+      // topRight: dx > 0, dy < 0 (moving right and up)
+      // topLeft: dx < 0, dy < 0 (moving left and up)
+      // downLeft: dx < 0, dy > 0 (moving left and down)
+      // downRight: dx > 0, dy > 0 (moving right and down)
+      
+      // Determine which isometric direction based on dx and dy signs
+      // Add 180 degrees (π) to reverse direction so character faces forward
+      if (dx > 0 && dy < 0) {
+        // topRight: 0 + 180 = 180 degrees
+        return Math.PI
+      } else if (dx < 0 && dy < 0) {
+        // topLeft: 90 + 180 = 270 degrees
+        return 3 * Math.PI / 2
+      } else if (dx < 0 && dy > 0) {
+        // downLeft: 180 + 180 = 360 degrees (0)
+        return 0
+      } else if (dx > 0 && dy > 0) {
+        // downRight: 270 + 180 = 450 degrees (90)
+        return Math.PI / 2
+      } else {
+        // Edge cases: use dominant axis, add 180 degrees
+        if (absDx > absDy) {
+          return dx > 0 ? Math.PI : 0
+        } else {
+          return dy > 0 ? (Math.PI / 2) : (3 * Math.PI / 2)
+        }
       }
     }
   }

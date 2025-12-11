@@ -43,7 +43,11 @@ export class IsoScene extends Container {
     )
     
     // Initialize pathfinder with extended grid size
-    this.pathfinder = new PF.AStarFinder()
+    // Enable diagonal movement (8 directions) but don't allow cutting corners through obstacles
+    this.pathfinder = new PF.AStarFinder({
+      allowDiagonal: true,
+      dontCrossCorners: true
+    })
     
     // Create obstacles first, then build grid with obstacles
     this.createRandomObstacles()
