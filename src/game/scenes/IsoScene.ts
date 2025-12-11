@@ -1,5 +1,6 @@
 import { Container, Graphics } from 'pixi.js'
 import { Character3D } from '../entities/Character3D'
+import { Cube } from '../entities/Cube'
 import { IsoUtils } from '../utils/IsoUtils'
 import * as PF from 'pathfinding'
 
@@ -18,6 +19,7 @@ export class IsoScene extends Container {
   private selectedTile: Graphics | null = null // Currently selected target tile
   private selectedTileKey: string | null = null // Key of currently selected tile
   private obstacles: Set<string> = new Set() // Store obstacle positions as "isoX,isoY"
+  private obstacleCubes: Map<string, Cube> = new Map() // Store obstacle cubes by grid coordinates "isoX,isoY"
   private adjacentTiles: Graphics[] = [] // Store currently highlighted adjacent tiles
 
   constructor(screenWidth: number, screenHeight: number) {
@@ -50,8 +52,8 @@ export class IsoScene extends Container {
       dontCrossCorners: true
     })
     
-    // Create obstacles first, then build grid with obstacles
-    this.createRandomObstacles()
+    // Create obstacles positions first (for pathfinding)
+    this.createRandomObstaclePositions()
     
     // Build pathfinding grid with obstacles marked as blocked
     const matrix = Array(this.extendedGridSize).fill(null).map(() => Array(this.extendedGridSize).fill(0))
@@ -71,6 +73,8 @@ export class IsoScene extends Container {
     this.grid = new PF.Grid(matrix)
 
     this.createGrid()
+    // Create obstacle cubes after grid so they appear on top
+    this.createObstacleCubes()
     this.createCharacter()
     this.updateScenePosition() // Set initial position
   }
@@ -127,10 +131,10 @@ export class IsoScene extends Container {
   }
 
   /**
-   * Create random obstacles in the scene
+   * Create random obstacle positions (for pathfinding)
    * Obstacles are placed randomly but avoid the character's starting position
    */
-  private createRandomObstacles() {
+  private createRandomObstaclePositions() {
     this.obstacles.clear()
     
     // Calculate obstacle density (about 15% of tiles will be obstacles)
@@ -144,7 +148,7 @@ export class IsoScene extends Container {
     // Also avoid a small area around the character (3x3 tiles)
     const avoidRadius = 1
     
-    // Generate random obstacles
+    // Generate random obstacle positions
     let placed = 0
     const maxAttempts = obstacleCount * 10 // Prevent infinite loop
     let attempts = 0
@@ -168,9 +172,39 @@ export class IsoScene extends Container {
         continue
       }
       
-      // Add obstacle
+      // Add obstacle to set
       this.obstacles.add(tileKey)
       placed++
+    }
+  }
+
+  /**
+   * Create 3D cubes for obstacles
+   * Obstacles are 3D cubes with brown color
+   */
+  private createObstacleCubes() {
+    // Remove existing obstacle cubes
+    for (const cube of this.obstacleCubes.values()) {
+      cube.destroy()
+      this.removeChild(cube)
+    }
+    this.obstacleCubes.clear()
+    
+    // Brown color for obstacles (0x8B4513 is saddle brown)
+    const obstacleColor = 0x8B4513
+    
+    // Create 3D cube for each obstacle
+    for (const obstacleKey of this.obstacles) {
+      const parts = obstacleKey.split(',')
+      if (parts.length >= 2 && parts[0] !== undefined && parts[1] !== undefined) {
+        const isoX = Number(parts[0])
+        const isoY = Number(parts[1])
+        if (!isNaN(isoX) && !isNaN(isoY)) {
+          const obstacleCube = new Cube(isoX, isoY, this.tileSize, obstacleColor)
+          this.obstacleCubes.set(obstacleKey, obstacleCube)
+          this.addChild(obstacleCube)
+        }
+      }
     }
   }
   
@@ -582,6 +616,11 @@ export class IsoScene extends Container {
     // Update character movement (time-based for consistent speed)
     this.character.update(deltaTime)
     
+    // Update obstacle cubes rendering
+    for (const cube of this.obstacleCubes.values()) {
+      cube.update(deltaTime)
+    }
+    
     // Update scene position immediately to keep character centered
     this.updateScenePosition()
   }
@@ -609,6 +648,11 @@ export class IsoScene extends Container {
         this.character.updateScale(this.tileSize)
       }
       
+      // Update obstacle cubes scale to match new tile size
+      for (const cube of this.obstacleCubes.values()) {
+        cube.updateScale(this.tileSize)
+      }
+      
       // Recreate grid with new tile size
       // Multiply by 2 to double the grid resolution (each original tile becomes 4 tiles)
       this.tiles.clear()
@@ -620,8 +664,24 @@ export class IsoScene extends Container {
       )
       const matrix = Array(this.extendedGridSize).fill(null).map(() => Array(this.extendedGridSize).fill(0))
       this.grid = new PF.Grid(matrix)
-      this.createRandomObstacles() // Recreate obstacles for new grid size
+      this.createRandomObstaclePositions() // Recreate obstacle positions for new grid size
+      // Build pathfinding grid with obstacles marked as blocked
+      for (const obstacleKey of this.obstacles) {
+        const parts = obstacleKey.split(',')
+        if (parts.length >= 2 && parts[0] !== undefined && parts[1] !== undefined) {
+          const isoX = Number(parts[0])
+          const isoY = Number(parts[1])
+          if (!isNaN(isoX) && !isNaN(isoY) && isoX >= 0 && isoX < this.extendedGridSize && isoY >= 0 && isoY < this.extendedGridSize) {
+            const row = matrix[isoY]
+            if (row) {
+              row[isoX] = 1
+            }
+          }
+        }
+      }
+      this.grid = new PF.Grid(matrix)
       this.createGrid()
+      this.createObstacleCubes() // Create obstacle cubes after grid
       this.addChild(this.character)
     } else {
       // Just update extended grid size if needed
@@ -635,8 +695,8 @@ export class IsoScene extends Container {
       // Only update if grid size changed significantly
       if (Math.abs(newExtendedGridSize - this.extendedGridSize) > 5) {
         this.extendedGridSize = newExtendedGridSize
-        // Recreate obstacles for new grid size
-        this.createRandomObstacles()
+        // Recreate obstacle positions for new grid size
+        this.createRandomObstaclePositions()
         // Recreate pathfinder grid with obstacles
         const matrix = Array(this.extendedGridSize).fill(null).map(() => Array(this.extendedGridSize).fill(0))
         for (const obstacleKey of this.obstacles) {
@@ -653,6 +713,8 @@ export class IsoScene extends Container {
           }
         }
         this.grid = new PF.Grid(matrix)
+        // Recreate obstacle cubes
+        this.createObstacleCubes()
       }
     }
     
