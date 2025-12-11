@@ -282,62 +282,68 @@ export class Character3D extends Container {
 
   /**
    * Calculate rotation angle from screen-space movement direction
-   * Supports 8 directions (including diagonals) but snaps to 4 main isometric directions
-   * Isometric 4 main directions: topRight (0°), topLeft (90°), downLeft (180°), downRight (270°)
-   * Diagonal movements snap to the dominant axis direction
+   * Uses smooth continuous rotation during movement (allows subdirections)
+   * This provides fluid rotation in all 8 directions while moving
    */
   private calculateIsoRotation(dx: number, dy: number): number {
     // Normalize movement direction
     const length = Math.sqrt(dx * dx + dy * dy)
     if (length < 0.1) return this.targetRotationY
     
-    const absDx = Math.abs(dx)
-    const absDy = Math.abs(dy)
+    // Use smooth rotation calculation (same as mouse following)
+    // Calculate actual angle using atan2 for smooth continuous rotation
+    let angle = Math.atan2(dy, dx)
     
-    // For diagonal movement, determine the dominant axis
-    // This allows 8-directional movement but character faces the 4 main directions
-    const isDiagonal = absDx > 0.1 && absDy > 0.1
+    // In isometric view, the coordinate system is rotated
+    // Based on isoToScreen: x = (isoX - isoY) * tileSize, y = (isoX + isoY) * tileSize / 2
+    // The screen coordinates are rotated 45 degrees from standard Cartesian
+    // Adjust the angle to align with isometric axes
+    angle += Math.PI / 4
     
-    if (isDiagonal) {
-      // Diagonal movement: snap to the dominant axis direction
-      if (absDx > absDy) {
-        // Horizontal movement is dominant
-        return dx > 0 ? Math.PI : 0 // Right or Left
-      } else {
-        // Vertical movement is dominant
-        return dy > 0 ? (Math.PI / 2) : (3 * Math.PI / 2) // Down or Up
-      }
-    } else {
-      // Pure horizontal or vertical movement (4 main directions)
-      // In isometric view, the 4 directions are:
-      // topRight: dx > 0, dy < 0 (moving right and up)
-      // topLeft: dx < 0, dy < 0 (moving left and up)
-      // downLeft: dx < 0, dy > 0 (moving left and down)
-      // downRight: dx > 0, dy > 0 (moving right and down)
+    // Add 180 degrees (π) so character faces the direction it's looking at
+    // Negate the angle to reverse rotation direction (clockwise movement = clockwise rotation)
+    angle = -angle + Math.PI
+    
+    // Normalize to [-π, π]
+    while (angle > Math.PI) angle -= Math.PI * 2
+    while (angle < -Math.PI) angle += Math.PI * 2
+    
+    return angle
+  }
+
+  /**
+   * Snap rotation to one of the 4 main isometric directions
+   * Called when character arrives at destination
+   */
+  private snapToMainDirection(): void {
+    // The 4 main isometric directions: 0°, 90°, 180°, 270°
+    const mainDirections: number[] = [0, Math.PI / 2, Math.PI, 3 * Math.PI / 2]
+    
+    // Find the nearest main direction
+    let nearestDirection: number = mainDirections[0]!
+    let smallestDiff = Math.abs(this.currentRotationY - mainDirections[0]!)
+    
+    // Normalize current rotation for comparison
+    let normalizedCurrent = this.currentRotationY
+    while (normalizedCurrent < 0) normalizedCurrent += Math.PI * 2
+    while (normalizedCurrent >= Math.PI * 2) normalizedCurrent -= Math.PI * 2
+    
+    for (const direction of mainDirections) {
+      // Calculate difference considering wrap-around
+      const diff1 = Math.abs(normalizedCurrent - direction)
+      const diff2 = Math.abs(normalizedCurrent - (direction + Math.PI * 2))
+      const diff3 = Math.abs(normalizedCurrent - (direction - Math.PI * 2))
+      const diff = Math.min(diff1, diff2, diff3)
       
-      // Determine which isometric direction based on dx and dy signs
-      // Add 180 degrees (π) to reverse direction so character faces forward
-      if (dx > 0 && dy < 0) {
-        // topRight: 0 + 180 = 180 degrees
-        return Math.PI
-      } else if (dx < 0 && dy < 0) {
-        // topLeft: 90 + 180 = 270 degrees
-        return 3 * Math.PI / 2
-      } else if (dx < 0 && dy > 0) {
-        // downLeft: 180 + 180 = 360 degrees (0)
-        return 0
-      } else if (dx > 0 && dy > 0) {
-        // downRight: 270 + 180 = 450 degrees (90)
-        return Math.PI / 2
-      } else {
-        // Edge cases: use dominant axis, add 180 degrees
-        if (absDx > absDy) {
-          return dx > 0 ? Math.PI : 0
-        } else {
-          return dy > 0 ? (Math.PI / 2) : (3 * Math.PI / 2)
-        }
+      if (diff < smallestDiff) {
+        smallestDiff = diff
+        nearestDirection = direction
       }
     }
+    
+    // Snap to nearest main direction
+    this.targetRotationY = nearestDirection
+    this.currentRotationY = nearestDirection
   }
 
   /**
@@ -426,6 +432,9 @@ export class Character3D extends Container {
         return true // Continue moving to next waypoint
       } else {
         // Reached end of path or no path
+        // Snap rotation to one of the 4 main directions when arriving at destination
+        this.snapToMainDirection()
+        
         this.isMoving = false
         this.path = []
         this.currentPathIndex = 0

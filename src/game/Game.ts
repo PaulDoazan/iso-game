@@ -68,12 +68,13 @@ export class Game {
     })
 
     // Handle mousemove events - rotate character towards mouse when not moving (for testing)
-    this.app.canvas.addEventListener('mousemove', (event) => {
-      const rect = this.app!.canvas.getBoundingClientRect()
-      const x = event.clientX - rect.left
-      const y = event.clientY - rect.top
-      this.scene!.handleMouseMove(x, y)
-    })
+    // DISABLED: Uncomment to enable mouse following rotation
+    // this.app.canvas.addEventListener('mousemove', (event) => {
+    //   const rect = this.app!.canvas.getBoundingClientRect()
+    //   const x = event.clientX - rect.left
+    //   const y = event.clientY - rect.top
+    //   this.scene!.handleMouseMove(x, y)
+    // })
   }
 
   private startGameLoop() {
