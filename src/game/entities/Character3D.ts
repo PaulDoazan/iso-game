@@ -22,6 +22,7 @@ export class Character3D extends Container {
   private currentRotationY: number = 0 // Current rotation angle in radians
   private targetRotationY: number = 0 // Target rotation angle in radians
   private rotationSpeed: number = 0.15 // Rotation interpolation speed (0-1) - slightly slower for more realistic feel
+  private mouseRotationSpeed: number = 0.4 // Faster rotation speed for mouse following
   
   // Three.js components
   private scene: THREE.Scene
@@ -444,7 +445,43 @@ export class Character3D extends Container {
   }
 
   /**
+   * Rotate character to face a target position (for testing - mouse follow)
+   * Only works when character is not moving
+   * Uses smooth continuous rotation based on actual angle to mouse
+   */
+  rotateTowardsPosition(targetX: number, targetY: number) {
+    if (this.isMoving) return // Don't override rotation when moving
+    
+    const dx = targetX - this.currentX
+    const dy = targetY - this.currentY
+    const length = Math.sqrt(dx * dx + dy * dy)
+    
+    if (length > 0.1) {
+      // Calculate actual angle to mouse using atan2
+      // In isometric view, we need to account for the coordinate system rotation
+      let angle = Math.atan2(dy, dx)
+      
+      // In isometric view, the coordinate system is rotated
+      // Based on isoToScreen: x = (isoX - isoY) * tileSize, y = (isoX + isoY) * tileSize / 2
+      // The screen coordinates are rotated 45 degrees from standard Cartesian
+      // Adjust the angle to align with isometric axes
+      angle += Math.PI / 4
+      
+      // Add 180 degrees (π) so character faces the direction it's looking at
+      // Negate the angle to reverse rotation direction (clockwise mouse = clockwise character)
+      angle = -angle + Math.PI
+      
+      // Normalize to [-π, π]
+      while (angle > Math.PI) angle -= Math.PI * 2
+      while (angle < -Math.PI) angle += Math.PI * 2
+      
+      this.targetRotationY = angle
+    }
+  }
+
+  /**
    * Smoothly rotate character towards target rotation
+   * Uses faster rotation speed when not moving (mouse following)
    */
   private updateRotation() {
     let current = this.currentRotationY
@@ -455,11 +492,14 @@ export class Character3D extends Container {
     while (diff > Math.PI) diff -= Math.PI * 2
     while (diff < -Math.PI) diff += Math.PI * 2
     
+    // Use faster rotation speed when not moving (for mouse following)
+    const speed = this.isMoving ? this.rotationSpeed : this.mouseRotationSpeed
+    
     // Smooth interpolation
     if (Math.abs(diff) < 0.01) {
       this.currentRotationY = target
     } else {
-      this.currentRotationY += diff * this.rotationSpeed
+      this.currentRotationY += diff * speed
     }
     
     // Normalize current angle

@@ -398,6 +398,18 @@ export class IsoScene extends Container {
   }
 
   /**
+   * Handle mouse move event - rotate character towards mouse when not moving
+   */
+  handleMouseMove(screenX: number, screenY: number) {
+    // Convert screen coordinates to world coordinates (relative to scene)
+    const worldX = screenX - this.x
+    const worldY = screenY - this.y
+    
+    // Rotate character towards mouse position (only when not moving)
+    this.character.rotateTowardsPosition(worldX, worldY)
+  }
+
+  /**
    * Update the scene (call in game loop)
    * @param deltaTime Time elapsed since last frame in seconds (from ticker.deltaTime)
    */
