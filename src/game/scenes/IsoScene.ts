@@ -314,6 +314,12 @@ export class IsoScene extends Container {
     const clampedGridX = clickedTile.gridX
     const clampedGridY = clickedTile.gridY
     
+    // Check if clicked tile is an obstacle - if so, ignore the click
+    const clickedTileKey = `${clampedGridX},${clampedGridY}`
+    if (this.obstacles.has(clickedTileKey)) {
+      return // Don't allow clicking on obstacles
+    }
+    
     // Highlight the target tile in yellow
     this.highlightTargetTile(clampedGridX, clampedGridY)
     
