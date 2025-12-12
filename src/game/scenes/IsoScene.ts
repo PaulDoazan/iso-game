@@ -442,12 +442,38 @@ export class IsoScene extends Container {
     const worldX = screenX - this.x
     const worldY = screenY - this.y
     
-    // Find the exact tile that contains the click point
-    const clickedTile = this.findTileAtScreenPosition(worldX, worldY)
-    if (!clickedTile) return
+    // First, check if click is on a cube (check entire cube area, not just base)
+    let clickedCube: Cube | null = null
+    let clickedCubeKey: string | null = null
     
-    const clampedGridX = clickedTile.gridX
-    const clampedGridY = clickedTile.gridY
+    for (const [cubeKey, cube] of this.obstacleCubes.entries()) {
+      if (cube.isPointInside(worldX, worldY)) {
+        clickedCube = cube
+        clickedCubeKey = cubeKey
+        break
+      }
+    }
+    
+    let clampedGridX: number
+    let clampedGridY: number
+    
+    // If a cube was clicked, use its position
+    if (clickedCube && clickedCubeKey) {
+      const parts = clickedCubeKey.split(',')
+      if (parts.length >= 2 && parts[0] !== undefined && parts[1] !== undefined) {
+        clampedGridX = Number(parts[0])
+        clampedGridY = Number(parts[1])
+      } else {
+        return
+      }
+    } else {
+      // Find the exact tile that contains the click point
+      const clickedTile = this.findTileAtScreenPosition(worldX, worldY)
+      if (!clickedTile) return
+      
+      clampedGridX = clickedTile.gridX
+      clampedGridY = clickedTile.gridY
+    }
     
     // Get current character position in isometric grid coordinates
     const currentPos = this.character.getPosition()

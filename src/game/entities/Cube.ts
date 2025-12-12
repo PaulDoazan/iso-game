@@ -223,6 +223,69 @@ export class Cube extends Container {
   }
 
   /**
+   * Check if a point (in world coordinates relative to scene) is inside the cube
+   * This checks the entire cube area including base, socle, and sides
+   */
+  isPointInside(worldX: number, worldY: number): boolean {
+    // Cube center position in world coordinates
+    const centerX = this.x
+    const centerY = this.y
+    
+    // Calculate the bounding box that encompasses the entire cube
+    // The cube extends from the base (at centerY) to the socle (at centerY - cubeHeight)
+    // Horizontally: from -halfWidth to +halfWidth
+    // Vertically: from base bottom (centerY + halfHeight) to socle top (centerY - cubeHeight - halfHeight)
+    
+    // Check if point is within the horizontal bounds (X axis)
+    const dx = Math.abs(worldX - centerX)
+    if (dx > this.halfWidth) {
+      return false
+    }
+    
+    // Check if point is within the vertical bounds (Y axis)
+    const topY = centerY - this.cubeHeight - this.halfHeight // Top of socle
+    const bottomY = centerY + this.halfHeight // Bottom of base
+    
+    if (worldY < topY || worldY > bottomY) {
+      return false
+    }
+    
+    // Now check if point is within the diamond shape at the base or socle level
+    // or within the sides (which form a trapezoid between base and socle)
+    
+    // Check base diamond
+    const baseDy = Math.abs(worldY - centerY)
+    if (dx / this.halfWidth + baseDy / this.halfHeight <= 1) {
+      return true
+    }
+    
+    // Check socle diamond
+    const socleCenterY = centerY - this.cubeHeight
+    const socleDy = Math.abs(worldY - socleCenterY)
+    if (dx / this.halfWidth + socleDy / this.halfHeight <= 1) {
+      return true
+    }
+    
+    // Check if point is within the sides (between base and socle)
+    // The sides form a trapezoid shape connecting base corners to socle corners
+    // For a point between base and socle, check if it's within the side bounds
+    if (worldY >= socleCenterY - this.halfHeight && worldY <= centerY + this.halfHeight) {
+      // The sides have the same horizontal extent (halfWidth) at all heights
+      // So if we're within the horizontal bounds and vertical bounds, we're in a side
+      // We can use a simple check: if point is within the diamond shape interpolated
+      // between base and socle based on Y position
+      const t = (worldY - (centerY + this.halfHeight)) / ((socleCenterY - this.halfHeight) - (centerY + this.halfHeight))
+      const interpolatedCenterY = centerY + (socleCenterY - centerY) * t
+      const sideDy = Math.abs(worldY - interpolatedCenterY)
+      if (dx / this.halfWidth + sideDy / this.halfHeight <= 1) {
+        return true
+      }
+    }
+    
+    return false
+  }
+
+  /**
    * Update cube scale based on tile size
    * Call this when tile size changes
    */
