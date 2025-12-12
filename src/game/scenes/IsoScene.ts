@@ -210,10 +210,10 @@ export class IsoScene extends Container {
           const obstacleCube = new Cube(isoX, isoY, this.tileSize, obstacleColor)
           this.obstacleCubes.set(obstacleKey, obstacleCube)
           
-          // Set zIndex based on isometric position (further back = lower zIndex)
-          // This ensures proper rendering order: cubes further back render first
-          // Use isoX + isoY to determine depth (higher sum = further back)
-          obstacleCube.zIndex = isoX + isoY
+          // Initial zIndex will be set by updateZOrdering() based on Y position
+          // For now, set a base zIndex based on isometric position
+          const screenPos = IsoUtils.isoToScreen(isoX, isoY, this.tileSize)
+          obstacleCube.zIndex = Math.floor(screenPos.y * 10)
           
           this.addChild(obstacleCube)
         }
@@ -368,6 +368,10 @@ export class IsoScene extends Container {
     
     // Set character position in screen coordinates (world space)
     this.character.setPosition(screenPos.x, screenPos.y)
+    
+    // Set initial zIndex based on Y position (will be updated dynamically)
+    this.character.zIndex = Math.floor(screenPos.y * 10)
+    
     this.addChild(this.character)
   }
 
@@ -636,6 +640,35 @@ export class IsoScene extends Container {
     
     // Update scene position immediately to keep character centered
     this.updateScenePosition()
+    
+    // Update z-ordering based on Y position (depth sorting)
+    this.updateZOrdering()
+  }
+
+  /**
+   * Update z-ordering to create depth illusion
+   * Objects with higher Y (lower on screen) are closer and should render on top
+   */
+  private updateZOrdering() {
+    // Get character position in world coordinates (relative to scene)
+    const characterPos = this.character.getPosition()
+    const characterY = characterPos.y
+    
+    // Update character zIndex based on Y position
+    // Use a large multiplier to ensure character can be above or below cubes
+    // Higher Y = closer to camera = higher zIndex
+    this.character.zIndex = Math.floor(characterY * 10)
+    
+    // Update each cube's zIndex based on its Y position
+    // We need to consider the cube's base position (where it sits on the tile)
+    for (const cube of this.obstacleCubes.values()) {
+      const cubePos = cube.getScreenPosition()
+      const cubeY = cubePos.y
+      
+      // Cube zIndex based on its base position
+      // Higher Y = closer to camera = higher zIndex
+      cube.zIndex = Math.floor(cubeY * 10)
+    }
   }
 
   /**
