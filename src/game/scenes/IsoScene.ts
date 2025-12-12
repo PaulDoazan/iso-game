@@ -21,6 +21,8 @@ export class IsoScene extends Container {
   private obstacles: Set<string> = new Set() // Store obstacle positions as "isoX,isoY"
   private obstacleCubes: Map<string, Cube> = new Map() // Store obstacle cubes by grid coordinates "isoX,isoY"
   private adjacentTiles: Graphics[] = [] // Store currently highlighted adjacent tiles
+  private selectedCube: Cube | null = null // Currently selected cube
+  private originalCubeColor: number = 0x8B4513 // Original brown color for cubes
 
   constructor(screenWidth: number, screenHeight: number) {
     super()
@@ -447,15 +449,6 @@ export class IsoScene extends Container {
     const clampedGridX = clickedTile.gridX
     const clampedGridY = clickedTile.gridY
     
-    // Check if clicked tile is an obstacle - if so, ignore the click
-    const clickedTileKey = `${clampedGridX},${clampedGridY}`
-    if (this.obstacles.has(clickedTileKey)) {
-      return // Don't allow clicking on obstacles
-    }
-    
-    // Highlight the target tile in yellow
-    this.highlightTargetTile(clampedGridX, clampedGridY)
-    
     // Get current character position in isometric grid coordinates
     const currentPos = this.character.getPosition()
     const currentIso = IsoUtils.screenToIso(currentPos.x, currentPos.y, this.tileSize)
@@ -482,28 +475,92 @@ export class IsoScene extends Container {
     
     this.grid = new PF.Grid(matrix)
     
-    // Find the closest adjacent tile (green tile) to the character's starting position
-    // The 4 adjacent positions around the target tile
-    const adjacentPositions = [
-      { x: clampedGridX + 1, y: clampedGridY }, // East
-      { x: clampedGridX - 1, y: clampedGridY }, // West
-      { x: clampedGridX, y: clampedGridY + 1 }, // South
-      { x: clampedGridX, y: clampedGridY - 1 }  // North
-    ]
+    // Check if clicked tile is an obstacle (cube)
+    const clickedTileKey = `${clampedGridX},${clampedGridY}`
+    const isCubeClicked = this.obstacles.has(clickedTileKey)
     
-    // Filter valid adjacent tiles (within bounds and not obstacles)
-    const validAdjacentTiles = adjacentPositions.filter(pos => {
-      if (pos.x < 0 || pos.x >= this.extendedGridSize || pos.y < 0 || pos.y >= this.extendedGridSize) {
-        return false
+    // Deselect previous cube if any
+    if (this.selectedCube) {
+      this.selectedCube.setColor(this.originalCubeColor)
+      this.selectedCube = null
+    }
+    
+    let targetGridX = clampedGridX
+    let targetGridY = clampedGridY
+    let characterTargetX = clampedGridX
+    let characterTargetY = clampedGridY
+    
+    // If a cube was clicked, select it and change its color
+    if (isCubeClicked) {
+      const clickedCube = this.obstacleCubes.get(clickedTileKey)
+      if (clickedCube) {
+        this.selectedCube = clickedCube
+        // Lighten the brown color (0x8B4513 -> lighter brown)
+        const lighterBrown = this.lightenCubeColor(this.originalCubeColor, 0.3)
+        clickedCube.setColor(lighterBrown)
       }
-      const tileKey = `${pos.x},${pos.y}`
-      return !this.obstacles.has(tileKey)
-    })
+      
+      // The yellow target tile should be placed UNDER the cube (on the cube's tile)
+      // So targetGridX and targetGridY remain as clampedGridX and clampedGridY
+      // But we still need to find an adjacent tile for the character to move to
+      
+      // The 4 adjacent positions around the cube
+      const adjacentPositions = [
+        { x: clampedGridX + 1, y: clampedGridY }, // East
+        { x: clampedGridX - 1, y: clampedGridY }, // West
+        { x: clampedGridX, y: clampedGridY + 1 }, // South
+        { x: clampedGridX, y: clampedGridY - 1 }  // North
+      ]
+      
+      // Filter valid adjacent tiles (within bounds and not obstacles)
+      const validAdjacentTiles = adjacentPositions.filter(pos => {
+        if (pos.x < 0 || pos.x >= this.extendedGridSize || pos.y < 0 || pos.y >= this.extendedGridSize) {
+          return false
+        }
+        const tileKey = `${pos.x},${pos.y}`
+        return !this.obstacles.has(tileKey)
+      })
+      
+      if (validAdjacentTiles.length === 0) {
+        return // No valid position to stand in front of the cube
+      }
+      
+      // Find the closest adjacent tile to the character's current position
+      let closestTile = validAdjacentTiles[0]!
+      let minDistance = Infinity
+      
+      for (const tile of validAdjacentTiles) {
+        const dx = tile.x - startGridX
+        const dy = tile.y - startGridY
+        const distance = Math.sqrt(dx * dx + dy * dy)
+        
+        if (distance < minDistance) {
+          minDistance = distance
+          closestTile = tile
+        }
+      }
+      
+      // Character moves to adjacent tile, but target highlight is on the cube
+      targetGridX = clampedGridX
+      targetGridY = clampedGridY
+      
+      // Store the adjacent tile for character movement
+      characterTargetX = closestTile.x
+      characterTargetY = closestTile.y
+    } else {
+      // Normal tile clicked, character moves to adjacent tile
+      characterTargetX = targetGridX
+      characterTargetY = targetGridY
+    }
     
-    // If no valid adjacent tiles, use target tile itself
-    if (validAdjacentTiles.length === 0) {
-      // Fallback to target tile if no adjacent tiles are available
-      const path = this.pathfinder.findPath(startGridX, startGridY, clampedGridX, clampedGridY, this.grid)
+    // Highlight the target tile in yellow (under the cube if cube clicked, otherwise on the clicked tile)
+    this.highlightTargetTile(targetGridX, targetGridY)
+    
+    // If a cube was clicked, character should go directly to the adjacent tile (green tile)
+    // No need to find another adjacent tile
+    if (isCubeClicked) {
+      // Character goes directly to the adjacent tile we found
+      const path = this.pathfinder.findPath(startGridX, startGridY, characterTargetX, characterTargetY, this.grid)
       if (path.length === 0) {
         return // No path found
       }
@@ -522,12 +579,63 @@ export class IsoScene extends Container {
         .filter((point): point is { x: number; y: number } => point !== null)
       
       if (screenPath.length === 0) {
-        const targetScreenPos = IsoUtils.isoToScreen(clampedGridX, clampedGridY, this.tileSize)
+        const targetScreenPos = IsoUtils.isoToScreen(characterTargetX, characterTargetY, this.tileSize)
         this.character.moveTo(targetScreenPos.x, targetScreenPos.y)
         return
       }
       
-      const targetScreenPos = IsoUtils.isoToScreen(clampedGridX, clampedGridY, this.tileSize)
+      // Face towards the cube
+      const targetScreenPos = IsoUtils.isoToScreen(targetGridX, targetGridY, this.tileSize)
+      this.character.moveAlongPath(screenPath, undefined, targetScreenPos)
+      return
+    }
+    
+    // Normal tile clicked: find the closest adjacent tile (green tile) to the character's starting position
+    // The 4 adjacent positions around the target tile
+    const adjacentPositions = [
+      { x: characterTargetX + 1, y: characterTargetY }, // East
+      { x: characterTargetX - 1, y: characterTargetY }, // West
+      { x: characterTargetX, y: characterTargetY + 1 }, // South
+      { x: characterTargetX, y: characterTargetY - 1 }  // North
+    ]
+    
+    // Filter valid adjacent tiles (within bounds and not obstacles)
+    const validAdjacentTiles = adjacentPositions.filter(pos => {
+      if (pos.x < 0 || pos.x >= this.extendedGridSize || pos.y < 0 || pos.y >= this.extendedGridSize) {
+        return false
+      }
+      const tileKey = `${pos.x},${pos.y}`
+      return !this.obstacles.has(tileKey)
+    })
+    
+    // If no valid adjacent tiles, use target tile itself
+    if (validAdjacentTiles.length === 0) {
+      // Fallback to target tile if no adjacent tiles are available
+      const path = this.pathfinder.findPath(startGridX, startGridY, characterTargetX, characterTargetY, this.grid)
+      if (path.length === 0) {
+        return // No path found
+      }
+      
+      const pathToFollow = path.length > 1 ? path.slice(1) : path
+      const screenPath = pathToFollow
+        .map((point) => {
+          if (point && point.length >= 2 && point[0] !== undefined && point[1] !== undefined) {
+            const isoX = point[0]
+            const isoY = point[1]
+            const screenPos = IsoUtils.isoToScreen(isoX, isoY, this.tileSize)
+            return { x: screenPos.x, y: screenPos.y }
+          }
+          return null
+        })
+        .filter((point): point is { x: number; y: number } => point !== null)
+      
+      if (screenPath.length === 0) {
+        const targetScreenPos = IsoUtils.isoToScreen(characterTargetX, characterTargetY, this.tileSize)
+        this.character.moveTo(targetScreenPos.x, targetScreenPos.y)
+        return
+      }
+      
+      const targetScreenPos = IsoUtils.isoToScreen(characterTargetX, characterTargetY, this.tileSize)
       this.character.moveAlongPath(screenPath, undefined, targetScreenPos)
       return
     }
@@ -565,7 +673,7 @@ export class IsoScene extends Container {
     // Debug: ensure pathToFollow is not empty
     if (pathToFollow.length === 0) {
       // If path only has one point (current position), use the target directly
-      const targetScreenPos = IsoUtils.isoToScreen(clampedGridX, clampedGridY, this.tileSize)
+      const targetScreenPos = IsoUtils.isoToScreen(targetGridX, targetGridY, this.tileSize)
       this.character.moveTo(targetScreenPos.x, targetScreenPos.y)
       return
     }
@@ -589,7 +697,10 @@ export class IsoScene extends Container {
     }
     
     // Calculate target tile position for final orientation
-    const targetScreenPos = IsoUtils.isoToScreen(clampedGridX, clampedGridY, this.tileSize)
+    // If a cube was clicked, face towards the cube, otherwise face the target tile
+    const finalTargetX = isCubeClicked ? clampedGridX : characterTargetX
+    const finalTargetY = isCubeClicked ? clampedGridY : characterTargetY
+    const targetScreenPos = IsoUtils.isoToScreen(finalTargetX, finalTargetY, this.tileSize)
     
     // Move character along the path (using screen coordinates)
     // Pass target position for final orientation
@@ -766,6 +877,16 @@ export class IsoScene extends Container {
     
     // Recenter character by updating scene position
     this.updateScenePosition()
+  }
+
+  /**
+   * Lighten a color by a percentage (for cube selection)
+   */
+  private lightenCubeColor(color: number, amount: number): number {
+    const r = Math.min(255, ((color >> 16) & 0xFF) + (255 * amount))
+    const g = Math.min(255, ((color >> 8) & 0xFF) + (255 * amount))
+    const b = Math.min(255, (color & 0xFF) + (255 * amount))
+    return (Math.floor(r) << 16) | (Math.floor(g) << 8) | Math.floor(b)
   }
 
   getCharacter(): Character3D {
