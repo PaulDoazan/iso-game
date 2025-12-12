@@ -25,6 +25,9 @@ export class IsoScene extends Container {
   constructor(screenWidth: number, screenHeight: number) {
     super()
     
+    // Enable zIndex sorting for proper cube rendering order
+    this.sortableChildren = true
+    
     this.screenWidth = screenWidth
     this.screenHeight = screenHeight
     
@@ -137,9 +140,9 @@ export class IsoScene extends Container {
   private createRandomObstaclePositions() {
     this.obstacles.clear()
     
-    // Calculate obstacle density (about 15% of tiles will be obstacles)
+    // Calculate obstacle density (about 7.5% of tiles will be obstacles)
     const totalTiles = this.extendedGridSize * this.extendedGridSize
-    const obstacleCount = Math.floor(totalTiles * 0.15)
+    const obstacleCount = Math.floor(totalTiles * 0.075)
     
     // Get character starting position to avoid placing obstacles there
     const centerIsoX = Math.round(this.extendedGridSize / 2)
@@ -182,6 +185,10 @@ export class IsoScene extends Container {
    * Create 3D cubes for obstacles
    * Obstacles are 3D cubes with brown color
    */
+  /**
+   * Create 3D cubes for obstacles
+   * Obstacles are 3D cubes with brown color
+   */
   private createObstacleCubes() {
     // Remove existing obstacle cubes
     for (const cube of this.obstacleCubes.values()) {
@@ -202,6 +209,12 @@ export class IsoScene extends Container {
         if (!isNaN(isoX) && !isNaN(isoY)) {
           const obstacleCube = new Cube(isoX, isoY, this.tileSize, obstacleColor)
           this.obstacleCubes.set(obstacleKey, obstacleCube)
+          
+          // Set zIndex based on isometric position (further back = lower zIndex)
+          // This ensures proper rendering order: cubes further back render first
+          // Use isoX + isoY to determine depth (higher sum = further back)
+          obstacleCube.zIndex = isoX + isoY
+          
           this.addChild(obstacleCube)
         }
       }

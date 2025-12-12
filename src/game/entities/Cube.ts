@@ -5,123 +5,167 @@ import { IsoUtils } from '../utils/IsoUtils'
  * Isometric Cube entity using PixiJS Graphics
  * 
  * This creates a 2D isometric cube that can be placed in a specific tile of the isometric scene.
- * The cube is oriented correctly for isometric view and takes exactly the surface of one tile.
+ * The cube base (socle) is dimensioned exactly like a tile.
  */
 export class Cube extends Container {
-  private graphics: Graphics
+  private baseGraphics: Graphics
+  private socleGraphics: Graphics
+  private sidesGraphics: Graphics
   
   // Position in isometric grid coordinates
   private isoX: number = 0
   private isoY: number = 0
   private tileSize: number = 64
   
-  // Cube dimensions (will be calculated based on tile size)
-  private cubeWidth: number = 0
-  private cubeHeight: number = 0
-  private cubeDepth: number = 0 // Height of the cube in 3D space
+  // Base dimensions (matching tile dimensions exactly)
+  private halfWidth: number = 0
+  private halfHeight: number = 0
   
-  // Colors for different faces (with shading for 3D effect)
-  private topColor: number = 0x3498db
-  private rightColor: number = 0x3498db
-  private frontColor: number = 0x3498db
+  // Cube height (depth in 3D space)
+  private cubeHeight: number = 0
+  
+  // Colors for different faces
+  private topColor: number = 0x3498db // Top face (socle) - lighter
+  private bottomColor: number = 0x3498db // Bottom face (base) - darker
+  private sideColor: number = 0x3498db // Side faces - medium dark
 
   constructor(isoX: number, isoY: number, tileSize: number, color: number = 0x3498db) {
     super()
+    
+    // Enable zIndex sorting for proper rendering order within cube
+    this.sortableChildren = true
     
     this.isoX = isoX
     this.isoY = isoY
     this.tileSize = tileSize
     
-    // Calculate colors for different faces (lighter for top, darker for sides)
+    // Set colors (lighter for top, darker for bottom, medium for sides)
     this.topColor = this.lightenColor(color, 0.2)
-    this.rightColor = this.darkenColor(color, 0.15)
-    this.frontColor = this.darkenColor(color, 0.25)
+    this.bottomColor = this.darkenColor(color, 0.25)
+    this.sideColor = this.darkenColor(color, 0.15)
     
-    // Create graphics object
-    this.graphics = new Graphics()
-    this.addChild(this.graphics)
+    // Create separate graphics objects for base, socle, and sides
+    this.baseGraphics = new Graphics()
+    this.socleGraphics = new Graphics()
+    this.sidesGraphics = new Graphics()
     
-    // Calculate cube dimensions and draw
-    this.updateCubeSize()
-    this.drawCube()
+    // Set zIndex to ensure all socles are above all bases and sides
+    // Bases have zIndex 0, sides have zIndex 0.5, socles have zIndex 1
+    this.baseGraphics.zIndex = 0
+    this.sidesGraphics.zIndex = 0.5
+    this.socleGraphics.zIndex = 1
+    
+    // Add base first, then sides, then socle (order matters for zIndex)
+    this.addChild(this.baseGraphics)
+    this.addChild(this.sidesGraphics)
+    this.addChild(this.socleGraphics)
+    
+    // Calculate base dimensions and cube height
+    this.updateBaseSize()
+    
+    // Draw the cube with top and bottom faces
+    this.drawBase()
     
     // Position cube at the tile center
     this.updatePosition()
   }
 
   /**
-   * Calculate cube size based on tile dimensions
-   * The cube should fit exactly within the tile's diamond shape
+   * Calculate base size to match tile dimensions exactly
+   * Tiles use: halfWidth = tileSize/2 * 2.0 = tileSize, halfHeight = tileSize/4 * 2.0 = tileSize/2
    */
-  private updateCubeSize() {
-    // Tile dimensions with scale 2.0:
-    // scaledHalfWidth = tileSize
-    // scaledHalfHeight = tileSize / 2
-    // Diamond width = 2 * scaledHalfWidth = 2 * tileSize
-    // Diamond height = 2 * scaledHalfHeight = tileSize
+  private updateBaseSize() {
+    // Match the tile dimensions from IsoScene.createGrid():
+    // halfWidth = tileSize / 2
+    // halfHeight = tileSize / 4
+    // scale = 2.0
+    // scaledHalfWidth = halfWidth * scale = tileSize
+    // scaledHalfHeight = halfHeight * scale = tileSize / 2
+    this.halfWidth = this.tileSize // scaledHalfWidth
+    this.halfHeight = this.tileSize / 2 // scaledHalfHeight
     
-    // For an isometric cube to take the full tile surface:
-    // The top face (diamond) should match the tile diamond exactly
-    // The cube width should match the tile's scaled half-width
-    this.cubeWidth = this.tileSize // Base width of the cube (matches scaledHalfWidth)
-    this.cubeHeight = this.tileSize / 2 // Height of the cube (matches scaledHalfHeight)
-    // Cube depth (3D height) - make it visible but not too tall
-    this.cubeDepth = this.tileSize * 0.6 // Height of the cube in 3D space
+    // Set cube height (depth in 3D space)
+    // Make it twice as high to look like a real cube
+    this.cubeHeight = this.tileSize * 1.2
   }
 
   /**
-   * Draw an isometric cube with 3 visible faces
-   * The cube takes the full size of a tile and has visible height
+   * Draw the cube with top face (socle), bottom face (base), and side faces
    */
-  private drawCube() {
-    this.graphics.clear()
+  private drawBase() {
+    // Clear all graphics
+    this.baseGraphics.clear()
+    this.socleGraphics.clear()
+    this.sidesGraphics.clear()
     
-    // Tile dimensions: scaledHalfWidth = tileSize, scaledHalfHeight = tileSize/2
-    // The cube base should match the tile diamond exactly
-    const halfWidth = this.cubeWidth  // = tileSize (scaledHalfWidth)
-    const halfHeight = this.cubeHeight // = tileSize/2 (scaledHalfHeight)
-    const depth = this.cubeDepth // Height of the cube in 3D
+    // In isometric projection, when moving up in 3D space (z increases),
+    // we move vertically up in 2D (no horizontal offset)
+    // The depth offset is only vertical: dy = height (up, so negative)
+    const depthOffsetY = -this.cubeHeight
     
-    // In isometric projection (2:1 ratio):
-    // - Moving down in 3D space (z decreases) moves down-right in 2D
-    // - The depth offset: dx = depth/2 (to the right), dy = depth (down)
-    const depthOffsetX = depth / 2
-    const depthOffsetY = depth
-    
-    // Draw faces in order: back faces first, then front faces (for proper z-ordering)
-    
-    // Right face (parallelogram, medium dark)
-    // This face extends from the right edge of the top face downward
-    this.graphics.poly([
-      halfWidth, 0,                              // Top-right (right edge of top face, front)
-      halfWidth + depthOffsetX, depthOffsetY,    // Bottom-right (back)
-      depthOffsetX, halfHeight + depthOffsetY,   // Bottom-left (back)
-      0, halfHeight                               // Top-left (front)
+    // Draw bottom face (base) - positioned at origin (on the tile)
+    this.baseGraphics.poly([
+      0, -this.halfHeight,           // Top
+      this.halfWidth, 0,              // Right
+      0, this.halfHeight,             // Bottom
+      -this.halfWidth, 0              // Left
     ])
-    this.graphics.fill(this.rightColor)
-    this.graphics.stroke({ width: 1, color: this.darkenColor(this.rightColor, 0.2) })
+    this.baseGraphics.fill(this.bottomColor)
+    this.baseGraphics.stroke({ width: 1, color: this.darkenColor(this.bottomColor, 0.2) })
     
-    // Front face (parallelogram, darkest)
-    // This face extends from the bottom edge of the top face downward
-    this.graphics.poly([
-      -halfWidth, 0,                             // Top-left (left edge of top face)
-      0, -halfHeight,                             // Top-center
-      halfWidth, 0,                               // Top-right
-      depthOffsetX, halfHeight + depthOffsetY    // Bottom-center (back)
+    // Draw top face (socle) - diamond shape matching tile exactly, offset upward
+    // Points: top, right, bottom, left (centered at origin, then shifted up)
+    this.socleGraphics.poly([
+      0, -this.halfHeight + depthOffsetY,           // Top
+      this.halfWidth, depthOffsetY,                  // Right
+      0, this.halfHeight + depthOffsetY,            // Bottom
+      -this.halfWidth, depthOffsetY                 // Left
     ])
-    this.graphics.fill(this.frontColor)
-    this.graphics.stroke({ width: 1, color: this.darkenColor(this.frontColor, 0.2) })
+    this.socleGraphics.fill(this.topColor)
+    this.socleGraphics.stroke({ width: 1, color: this.darkenColor(this.topColor, 0.2) })
     
-    // Top face (diamond shape matching tile, lighter color)
-    // Draw last so it appears on top
-    this.graphics.poly([
-      0, -halfHeight,           // Top
-      halfWidth, 0,              // Right
-      0, halfHeight,             // Bottom
-      -halfWidth, 0              // Left
+    // Draw 4 side faces connecting base to socle
+    // Each face is a parallelogram connecting corresponding corners
+    
+    // Top face (connects top of base to top of socle)
+    this.sidesGraphics.poly([
+      0, -this.halfHeight,                    // Base top
+      this.halfWidth, 0,                      // Base right
+      this.halfWidth, depthOffsetY,           // Socle right
+      0, -this.halfHeight + depthOffsetY     // Socle top
     ])
-    this.graphics.fill(this.topColor)
-    this.graphics.stroke({ width: 1, color: this.darkenColor(this.topColor, 0.2) })
+    this.sidesGraphics.fill(this.sideColor)
+    this.sidesGraphics.stroke({ width: 1, color: this.darkenColor(this.sideColor, 0.2) })
+    
+    // Right face (connects right of base to right of socle)
+    this.sidesGraphics.poly([
+      this.halfWidth, 0,                      // Base right
+      0, this.halfHeight,                     // Base bottom
+      0, this.halfHeight + depthOffsetY,      // Socle bottom
+      this.halfWidth, depthOffsetY            // Socle right
+    ])
+    this.sidesGraphics.fill(this.darkenColor(this.sideColor, 0.1))
+    this.sidesGraphics.stroke({ width: 1, color: this.darkenColor(this.sideColor, 0.2) })
+    
+    // Bottom face (connects bottom of base to bottom of socle)
+    this.sidesGraphics.poly([
+      0, this.halfHeight,                     // Base bottom
+      -this.halfWidth, 0,                     // Base left
+      -this.halfWidth, depthOffsetY,          // Socle left
+      0, this.halfHeight + depthOffsetY      // Socle bottom
+    ])
+    this.sidesGraphics.fill(this.darkenColor(this.sideColor, 0.15))
+    this.sidesGraphics.stroke({ width: 1, color: this.darkenColor(this.sideColor, 0.2) })
+    
+    // Left face (connects left of base to left of socle)
+    this.sidesGraphics.poly([
+      -this.halfWidth, 0,                     // Base left
+      0, -this.halfHeight,                    // Base top
+      0, -this.halfHeight + depthOffsetY,   // Socle top
+      -this.halfWidth, depthOffsetY           // Socle left
+    ])
+    this.sidesGraphics.fill(this.darkenColor(this.sideColor, 0.1))
+    this.sidesGraphics.stroke({ width: 1, color: this.darkenColor(this.sideColor, 0.2) })
   }
 
   /**
@@ -184,8 +228,8 @@ export class Cube extends Container {
    */
   updateScale(newTileSize: number) {
     this.tileSize = newTileSize
-    this.updateCubeSize()
-    this.drawCube()
+    this.updateBaseSize()
+    this.drawBase()
     this.updatePosition()
   }
 
@@ -193,18 +237,22 @@ export class Cube extends Container {
    * Set cube color
    */
   setColor(color: number) {
-    // Calculate colors for different faces (lighter for top, darker for sides)
     this.topColor = this.lightenColor(color, 0.2)
-    this.rightColor = this.darkenColor(color, 0.15)
-    this.frontColor = this.darkenColor(color, 0.25)
-    this.drawCube()
+    this.bottomColor = this.darkenColor(color, 0.25)
+    this.sideColor = this.darkenColor(color, 0.15)
+    this.drawBase()
   }
+
 
   /**
    * Clean up resources
    */
   destroy() {
-    this.graphics.destroy()
+    this.baseGraphics.destroy()
+    this.socleGraphics.destroy()
+    this.sidesGraphics.destroy()
     super.destroy()
   }
 }
+
+
