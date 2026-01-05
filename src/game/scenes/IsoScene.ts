@@ -443,10 +443,22 @@ export class IsoScene extends Container {
     const worldY = screenY - this.y
     
     // First, check if click is on a cube (check entire cube area, not just base)
+    // Sort cubes by Y position (depth) - higher Y = closer to camera = should be checked first
+    // This ensures that when cubes overlap, the visually front cube is selected
     let clickedCube: Cube | null = null
     let clickedCubeKey: string | null = null
     
-    for (const [cubeKey, cube] of this.obstacleCubes.entries()) {
+    // Create array of cubes with their positions for sorting
+    const cubesWithPositions = Array.from(this.obstacleCubes.entries()).map(([cubeKey, cube]) => {
+      const pos = cube.getScreenPosition()
+      return { cubeKey, cube, y: pos.y }
+    })
+    
+    // Sort by Y position descending (higher Y = closer to camera = check first)
+    cubesWithPositions.sort((a, b) => b.y - a.y)
+    
+    // Check cubes in depth order (front to back)
+    for (const { cubeKey, cube } of cubesWithPositions) {
       if (cube.isPointInside(worldX, worldY)) {
         clickedCube = cube
         clickedCubeKey = cubeKey
